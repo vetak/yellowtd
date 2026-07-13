@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YellowTD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="game-area">
+    <canvas id="game-canvas"></canvas>
+    <div id="overlay" class="hidden">
+      <div id="overlay-title"></div>
+      <div id="overlay-text"></div>
+      <div id="overlay-stats"></div>
+      <div class="overlay-btns">
+        <button id="restart-btn">Играть снова</button>
+        <button id="overlay-menu-btn">Главное меню</button>
+      </div>
+    </div>
+  </div>
+  <aside id="sidebar">
+    <h1>Yellow<span>TD</span></h1>
+    <div id="stats">
+      <div class="stat"><span class="label">Золото</span><span id="gold-value" class="gold"></span></div>
+      <div class="stat"><span class="label">Жизни</span><span id="lives-value" class="lives"></span></div>
+      <div class="stat"><span class="label">Волна</span><span id="wave-value"></span></div>
+    </div>
+    <div id="wave-panel">
+      <div id="wave-name"></div>
+      <div id="wave-desc"></div>
+      <div class="wave-row">
+        <span id="wave-timer"></span>
+        <button id="send-wave-btn">Отправить волну</button>
+      </div>
+    </div>
+    <div id="build-panel">
+      <div class="panel-title">Строительство</div>
+      <div id="build-buttons"></div>
+    </div>
+    <div id="info-panel"></div>
+    <div id="controls">
+      <button id="pause-btn">Пауза</button>
+      <button class="speed-btn" data-speed="1">x1</button>
+      <button class="speed-btn" data-speed="2">x2</button>
+      <button class="speed-btn" data-speed="3">x3</button>
+      <button id="menu-btn">Меню</button>
+    </div>
+    <div id="message"></div>
+    <div id="footer-line"></div>
+  </aside>
+</div>
+
+<div id="menu" class="hidden">
+  <div class="menu-card">
+    <div class="menu-title">Yellow<span>TD</span></div>
+    <div id="menu-version"></div>
+    <div id="menu-message"></div>
+
+    <div id="screen-main" class="menu-screen">
+      <button id="menu-new">Новая игра</button>
+      <button id="menu-continue">Продолжить</button>
+      <button id="menu-settings-btn">Настройки</button>
+      <button id="menu-export">Экспорт сейва</button>
+      <button id="menu-import">Импорт сейва</button>
+      <button id="menu-exit">Выход</button>
+    </div>
+
+    <div id="screen-pause" class="menu-screen hidden">
+      <div class="screen-title">Пауза</div>
+      <div class="muted">Забег сохранён. Можно продолжить, перезапустить или открыть настройки.</div>
+      <button id="menu-resume">Продолжить бой</button>
+      <button id="menu-restart">Начать заново</button>
+      <button id="menu-pause-settings">Настройки</button>
+      <button id="menu-to-main">Главное меню</button>
+    </div>
+
+    <div id="screen-difficulty" class="menu-screen hidden">
+      <div class="screen-title">Выбор сложности</div>
+      <div id="diff-buttons"></div>
+      <button id="back-from-difficulty" class="menu-back">Назад</button>
+    </div>
+
+    <div id="screen-settings" class="menu-screen hidden">
+      <div class="screen-title">Настройки</div>
+      <label class="set-row">
+        <span>Стартовая скорость игры</span>
+        <select id="set-speed">
+          <option value="1">x1</option>
+          <option value="2">x2</option>
+          <option value="3">x3</option>
+        </select>
+      </label>
+      <label class="set-row">
+        <span>Автозапуск волн по таймеру</span>
+        <input type="checkbox" id="set-autostart">
+      </label>
+      <label class="set-row">
+        <span>Плавающий боевой текст</span>
+        <input type="checkbox" id="set-floating">
+      </label>
+      <label class="set-row">
+        <span>Показывать радиус башни при наведении</span>
+        <input type="checkbox" id="set-range">
+      </label>
+      <button id="back-from-settings" class="menu-back">Назад</button>
+    </div>
+
+    <div id="screen-exit" class="menu-screen hidden">
+      <div class="screen-title">До встречи</div>
+      <div class="muted">Браузер не даёт закрыть вкладку автоматически. Её можно закрыть вручную.</div>
+      <button id="back-from-exit" class="menu-back">Назад</button>
+    </div>
+  </div>
+</div>
+<div id="tooltip" class="hidden"></div>
+
+<script src="data/config.js"></script>
+<script src="data/map.js"></script>
+<script src="data/creeps.js"></script>
+<script src="data/towers.js"></script>
+<script src="data/waves.js"></script>
+<script src="engine/path.js"></script>
+<script src="engine/sim.js"></script>
+<script src="render/renderer.js"></script>
+<script src="ui/storage.js"></script>
+<script src="ui/platform.js"></script>
+<script src="ui/menu.js"></script>
+<script src="ui/ui.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
