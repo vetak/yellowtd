@@ -23,6 +23,7 @@ class UI {
     this.onOpenMenu = opts.onOpenMenu;          // pause menu
     this.onMainMenu = opts.onMainMenu || opts.onOpenMenu; // main menu (game over)
     this.isActive = opts.isActive;      // () => game is running (not in menu)
+    this.isNewRecord = opts.isNewRecord || (() => false); // () => this run topped its leaderboard
     this.settings = opts.settings;      // live-updated user settings object
     this.towersCfg = opts.towers;
     this.creepsCfg = opts.creeps;
@@ -465,7 +466,8 @@ class UI {
     this.el['overlay'].classList.toggle('hidden', !over);
     if (over) {
       const win = sim.state.phase === 'victory';
-      this._set('overlay-title', win ? 'ПОБЕДА' : 'ПОРАЖЕНИЕ');
+      const record = this.isNewRecord() ? ' 🏆 Новый рекорд!' : '';
+      this._set('overlay-title', (win ? 'ПОБЕДА' : 'ПОРАЖЕНИЕ') + record);
       this._set('overlay-text', win
         ? `Золотые пески защищены. Осталось жизней: ${sim.state.lives}.`
         : `Оборона пала на волне ${sim.state.waveIndex + 1}.`);

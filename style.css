@@ -183,6 +183,17 @@ button.active { background: #6b5d1f; border-color: #e6c832; }
 
 /* Version-select screen needs a wider card for the route previews. */
 .menu-card:has(#screen-version:not(.hidden)) { width: 560px; }
+.menu-card:has(#screen-records:not(.hidden)) { width: 560px; }
+
+.diff-btn.locked { opacity: 0.55; cursor: default; }
+.diff-btn.locked:hover { background: none; }
+
+#records-body { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow: auto; }
+.records-title { font-size: 13px; font-weight: 700; color: #e6c832; margin-bottom: 4px; }
+.records-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.records-table th, .records-table td { padding: 3px 6px; text-align: left; }
+.records-table th { color: #a89e75; font-weight: 600; }
+.records-table td { color: #eae3c8; }
 #version-cards { display: flex; flex-direction: column; gap: 10px; }
 .version-card {
   display: flex; gap: 12px; align-items: center;

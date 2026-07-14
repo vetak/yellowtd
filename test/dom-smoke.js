@@ -119,8 +119,11 @@ check('bootstrap: starts in main menu',
 check('bootstrap: canvas sized from MapConfig (24x18 @36)',
   elements['game-canvas'].width === 864 && elements['game-canvas'].height === 648,
   `${elements['game-canvas'].width}x${elements['game-canvas'].height}`);
-check('bootstrap: 7 build buttons, 3 difficulty buttons',
-  Object.keys(YTD.ui.buildBtns).length === 7 && elements['diff-buttons'].children.length === 3);
+check('bootstrap: 7 build buttons, 4 difficulty buttons (incl. locked Nightmare)',
+  Object.keys(YTD.ui.buildBtns).length === 7 && elements['diff-buttons'].children.length === 4);
+check('bootstrap: Nightmare starts locked',
+  elements['diff-buttons'].children[3].disabled === true &&
+  String(elements['diff-buttons'].children[3].className).includes('locked'));
 check('bootstrap: continue disabled without a save', elements['menu-continue'].disabled === true);
 
 function runFrames(n, stepMs = 50) {
@@ -280,6 +283,27 @@ try {
     !!(classicSave && classicSave.state) && !!(canyonSave && canyonSave.state) &&
     classicSave.versionId === 'classic' && canyonSave.versionId === 'canyon');
 
+  // --- 0.10.0: Nightmare unlock + leaderboard ---
+  check('Nightmare stays locked before any Hard win', !YTD.Storage.hasWon('hard'));
+  YTD.Storage.recordVictory('hard');
+  check('Nightmare unlocks after a recorded Hard win', YTD.Storage.hasWon('hard'));
+  YTD.menu.show('difficulty');
+  // FakeElement.innerHTML='' doesn't clear .children (test stub limitation),
+  // so buttons from earlier rebuilds pile up — the latest batch is the tail.
+  const lastDiffBtn = elements['diff-buttons'].children[elements['diff-buttons'].children.length - 1];
+  check('Nightmare button unlocks live in the menu after victory',
+    lastDiffBtn.disabled === false && !String(lastDiffBtn.className).includes('locked'));
+
+  YTD.Storage.addRecord('canyon', 'normal', { wave: 24, lives: 30, gold: 700, ticks: 14000, won: true, at: Date.now() });
+  YTD.Storage.addRecord('canyon', 'normal', { wave: 10, lives: 0, gold: 300, ticks: 5000, won: false, at: Date.now() });
+  const records = YTD.Storage.getRecords('canyon', 'normal');
+  check('records are sorted best-first and capped',
+    records.length === 2 && records[0].wave === 24 && records[1].wave === 10);
+  YTD.menu.show('records');
+  check('records screen renders a leaderboard table',
+    elements['records-body'].innerHTML.includes('Каньон') && elements['records-body'].innerHTML.includes('24'));
+  YTD.menu.show('main');
+
   // continue button reports which save is the most recent one
   YTD.app.openMainMenu();
   check('continue caption mentions the saved version',
@@ -288,6 +312,30 @@ try {
   elements['menu-continue'].fire('click');
   check('continue restores the canyon session',
     YTD.app.state === 'playing' && YTD.versionId === 'canyon' && YTD.sim.map.cols === 20);
+
+  // --- 0.10.0: victory overlay shows "Новый рекорд!" when this run tops the board ---
+  {
+    const sim = YTD.sim;
+    sim.state.waveIndex = sim.waves.length - 1; // last wave
+    sim.state.phase = 'build';
+    sim.state.lives = 30;
+    sim.state.gold = 999999; // guarantee it wins the gold tie-break vs the earlier synthetic record
+    sim.startWave();
+    sim.state.creeps = [];
+    sim.state.spawns = [];
+    YTD.loop.paused = false;
+    runFrames(3);
+    check('forced run reached victory', sim.state.phase === 'victory', `phase=${sim.state.phase}`);
+    check('victory overlay shows the new-record badge',
+      elements['overlay-title'].innerHTML.includes('Новый рекорд'),
+      elements['overlay-title'].innerHTML);
+    const top = YTD.Storage.getRecords('canyon', 'normal')[0];
+    check('the new record is actually on top of the canyon/normal leaderboard',
+      top && top.wave === 24 && top.gold > 999999, JSON.stringify(top));
+    // Victory clears the canyon autosave — start a fresh run so the save/export
+    // checks further down still have a canyon save to work with.
+    YTD.app.startNewGame('normal', 'canyon');
+  }
 
   // menu button -> pause screen; exit lives on the main screen
   elements['menu-btn'].fire('click');

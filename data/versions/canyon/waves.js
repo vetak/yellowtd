@@ -4,12 +4,12 @@
 globalThis.CanyonVersion = globalThis.CanyonVersion || {};
 CanyonVersion.waves = [
   // ---- Акт I (1–12)
-  { name: 'Лазутчики', bonus: 12, groups: [{ creep: 'walker', count: 10, interval: 1.0, hp: 34, bounty: 2 }] },
-  { name: 'Сборщики меди', bonus: 14, groups: [{ creep: 'walker', count: 12, interval: 0.9, hp: 48, bounty: 2 }] },
-  { name: 'Бегуны ущелья', bonus: 16, groups: [{ creep: 'sprinter', count: 12, interval: 0.8, hp: 38, bounty: 2 }] },
+  { name: 'Лазутчики', bonus: 12, groups: [{ creep: 'walker', count: 10, interval: 1.0, hp: 38, bounty: 2 }] },
+  { name: 'Сборщики меди', bonus: 14, groups: [{ creep: 'walker', count: 12, interval: 0.9, hp: 54, bounty: 2 }] },
+  { name: 'Бегуны ущелья', bonus: 16, groups: [{ creep: 'sprinter', count: 12, interval: 0.8, hp: 43, bounty: 2 }] },
   { name: 'Каменные лбы', bonus: 18, groups: [{ creep: 'bulwark', count: 8, interval: 1.3, hp: 140, bounty: 4, armor: 2 }] },
-  { name: 'Осиное гнездо', bonus: 20, groups: [{ creep: 'wasp', count: 12, interval: 0.9, hp: 62, bounty: 3 }] },
-  { name: 'Караван по дну', bonus: 22, groups: [{ creep: 'walker', count: 15, interval: 0.75, hp: 105, bounty: 3 }] },
+  { name: 'Осиное гнездо', bonus: 20, groups: [{ creep: 'wasp', count: 12, interval: 0.9, hp: 70, bounty: 3 }] },
+  { name: 'Караван по дну', bonus: 22, groups: [{ creep: 'walker', count: 15, interval: 0.75, hp: 118, bounty: 3 }] },
   { name: 'Медная жила', bonus: 24, extra: true, groups: [{ creep: 'scarab', count: 16, interval: 0.72, hp: 100, bounty: 3 }] },
   { name: 'Заклинатели эха', bonus: 26, regen: 6, groups: [{ creep: 'shaman', count: 10, interval: 1.0, hp: 190, bounty: 4, armor: 2 }] },
   { name: 'Верхний ярус', bonus: 28, groups: [{ creep: 'wasp', count: 14, interval: 0.8, hp: 165, bounty: 4 }] },

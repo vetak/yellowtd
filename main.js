@@ -22,6 +22,7 @@
 
   let sim = null;
   let difficultyId = 'normal';
+  let lastRunNewRecord = false; // did the most recent run land at #1 on its leaderboard?
   let appState = 'menu';
   let menuMode = 'main';
 
@@ -89,6 +90,14 @@
     };
   }
 
+  // Gated difficulties (e.g. "Кошмар") require a prior victory on their
+  // `unlockedBy` difficulty, tracked across all versions in Storage.
+  function isDifficultyUnlocked(diffId) {
+    const def = DifficultyConfig[diffId];
+    if (!def || !def.unlockedBy) return true;
+    return Storage.hasWon(def.unlockedBy);
+  }
+
   function updateFooter() {
     const el = document.getElementById('footer-line');
     const ver = ' · ' + VersionsConfig[versionId].name;
@@ -99,6 +108,7 @@
   function enterGame() {
     renderer.reset();
     ui.reset();
+    lastRunNewRecord = false;
     loop.paused = false;
     loop.speed = settings.defaultSpeed;
     appState = 'playing';
@@ -108,7 +118,7 @@
   }
 
   function startNewGame(diffId, verId) {
-    difficultyId = diffId in DifficultyConfig ? diffId : 'normal';
+    difficultyId = diffId in DifficultyConfig && isDifficultyUnlocked(diffId) ? diffId : 'normal';
     applyVersion(verId !== undefined ? verId : versionId);
     sim = createSim(difficultyId, versionId);
     enterGame();
@@ -216,6 +226,7 @@
     onOpenMenu: openPauseMenu,
     onMainMenu: openMainMenu,
     isActive: () => appState === 'playing' && !!sim,
+    isNewRecord: () => lastRunNewRecord,
   });
 
   const menu = new Menu({
@@ -229,6 +240,8 @@
       : 'Браузер не даёт закрыть вкладку автоматически. Её можно закрыть вручную.',
     hasSave,
     continueInfo,
+    isDifficultyUnlocked,
+    getRecords: (verId, diffId) => Storage.getRecords(verId, diffId),
     onNewGame: startNewGame,
     onContinue: continueGame,
     onResume: resumeGame,
@@ -286,7 +299,20 @@
         audio.ingestEvents(sim.state.events);
         for (const ev of sim.state.events) {
           if (ev.type === 'waveStart' || ev.type === 'waveEnd') saveNow();
-          else if (ev.type === 'victory' || ev.type === 'defeat') Storage.clearGame(versionId);
+          else if (ev.type === 'victory' || ev.type === 'defeat') {
+            Storage.clearGame(versionId);
+            if (ev.type === 'victory') Storage.recordVictory(difficultyId);
+            const entry = {
+              wave: sim.state.waveIndex, // waves fully completed — matches "Волн пройдено" on the results screen
+              lives: sim.state.lives,
+              gold: sim.state.gold,
+              ticks: sim.state.tick,
+              won: ev.type === 'victory',
+              at: Date.now(),
+            };
+            const ranked = Storage.addRecord(versionId, difficultyId, entry);
+            lastRunNewRecord = ranked[0] === entry; // reference check: did it land on top?
+          }
         }
         acc -= sim.dt;
         steps++;

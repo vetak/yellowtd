@@ -6,6 +6,9 @@
 const Storage = (() => {
   const SAVE_PREFIX = 'yellowtd.save.';
   const SETTINGS_KEY = 'yellowtd.settings';
+  const PROGRESS_KEY = 'yellowtd.progress';
+  const RECORDS_PREFIX = 'yellowtd.records.';
+  const MAX_RECORDS = 5;
 
   let backend;
   try {
@@ -59,6 +62,32 @@ const Storage = (() => {
     saveSettings(settings) { return writeJson(SETTINGS_KEY, settings); },
     loadSettings(defaults) {
       return Object.assign({}, defaults, readJson(SETTINGS_KEY) || {});
+    },
+
+    // ---- Progress: which difficulties have ever been won (any version).
+    // Used to gate unlockable difficulties like "Кошмар" (unlockedBy: <id>).
+    recordVictory(difficultyId) {
+      const progress = readJson(PROGRESS_KEY) || { won: {} };
+      progress.won[difficultyId] = true;
+      writeJson(PROGRESS_KEY, progress);
+    },
+    hasWon(difficultyId) {
+      const progress = readJson(PROGRESS_KEY);
+      return !!(progress && progress.won && progress.won[difficultyId]);
+    },
+
+    // ---- Leaderboard: best runs per version x difficulty, newest ties lose.
+    // Sorted by wave reached (desc), then lives left (desc), then gold (desc).
+    addRecord(versionId, difficultyId, entry) {
+      const key = RECORDS_PREFIX + versionId + '.' + difficultyId;
+      const list = readJson(key) || [];
+      list.push(entry);
+      list.sort((a, b) => (b.wave - a.wave) || (b.lives - a.lives) || (b.gold - a.gold));
+      writeJson(key, list.slice(0, MAX_RECORDS));
+      return list.length > MAX_RECORDS ? list.slice(0, MAX_RECORDS) : list;
+    },
+    getRecords(versionId, difficultyId) {
+      return readJson(RECORDS_PREFIX + versionId + '.' + difficultyId) || [];
     },
   };
 })();

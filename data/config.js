@@ -1,5 +1,5 @@
 // Global game rules. Everything tunable lives in data/ — the engine hardcodes nothing.
-const GAME_VERSION = '0.9.0';
+const GAME_VERSION = '0.10.0';
 
 const GameConfig = {
   tickRate: 20,           // fixed simulation steps per second (deterministic)
@@ -26,7 +26,15 @@ const DifficultyConfig = {
     name: 'Тяжёлая', startLives: 20, startGold: 50, hpMul: 1.25,
     desc: 'Меньше жизней, враги крепче',
   },
+  nightmare: {
+    name: 'Кошмар', startLives: 15, startGold: 45, hpMul: 1.5,
+    desc: 'Только для победивших на Тяжёлой: мало жизней, самые крепкие враги',
+    unlockedBy: 'hard', // requires a prior victory on this difficulty (or higher)
+  },
 };
+
+// Order used to compare difficulty "tiers" for unlock checks (easy < normal < ...).
+const DifficultyOrder = ['easy', 'normal', 'hard', 'nightmare'];
 
 // User settings (persisted in browser storage). These are the defaults.
 const DefaultSettings = {

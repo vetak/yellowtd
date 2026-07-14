@@ -407,6 +407,20 @@ check('classic: deterministic replay',
   check('hard multiplies creep HP', c && c.maxHp === Math.round(40 * 1.25));
 }
 
+// 0.10.0: "Кошмар" difficulty — data multiplier, no engine changes required.
+{
+  check('registry: nightmare difficulty exists and is gated by hard',
+    E.DifficultyConfig.nightmare && E.DifficultyConfig.nightmare.unlockedBy === 'hard' &&
+    E.DifficultyConfig.nightmare.startLives === 15 && E.DifficultyConfig.nightmare.hpMul === 1.5);
+  const nightmare = newSim('nightmare');
+  check('nightmare start resources', nightmare.state.gold === 45 && nightmare.state.lives === 15,
+    `gold ${nightmare.state.gold}, lives ${nightmare.state.lives}`);
+  nightmare.startWave();
+  for (let i = 0; i < 30 && nightmare.state.creeps.length === 0; i++) nightmare.step();
+  const nc = nightmare.state.creeps[0];
+  check('nightmare multiplies creep HP', nc && nc.maxHp === Math.round(40 * 1.5));
+}
+
 const goodHard = run(planGood, { difficulty: 'hard' });
 check('classic: good build → victory (hard)', goodHard.result === 'victory',
   `phase ${goodHard.result}, wave ${goodHard.wave}, lives ${goodHard.lives}`);
@@ -430,11 +444,11 @@ const planGoodCanyon = [
   // Западный «замок»: клетки (3-4, 7-8) видят 4 прохода (col5, row6, col2, row10)
   { wave: 0,  action: 'build',   tower: 'arrow',   col: 3,  row: 7 },
   { wave: 0,  action: 'build',   tower: 'arrow',   col: 4,  row: 8 },
-  { wave: 1,  action: 'build',   tower: 'arrow',   col: 5,  row: 7 },
+  { wave: 1,  action: 'upgrade', col: 3,  row: 7 },
+  { wave: 1,  action: 'upgrade', col: 4,  row: 8 },
   { wave: 2,  action: 'build',   tower: 'frost',   col: 3,  row: 8 },
-  { wave: 3,  action: 'upgrade', col: 3,  row: 7 },
-  { wave: 3,  action: 'upgrade', col: 4,  row: 8 },
-  { wave: 4,  action: 'build',   tower: 'antiair', col: 4,  row: 7 },
+  { wave: 3,  action: 'build',   tower: 'antiair', col: 4,  row: 7 },
+  { wave: 4,  action: 'build',   tower: 'arrow',   col: 5,  row: 7 },
   { wave: 5,  action: 'upgrade', col: 5,  row: 7 },
   { wave: 6,  action: 'build',   tower: 'cannon',  col: 6,  row: 11 },
   { wave: 7,  action: 'upgrade', col: 6,  row: 11 },

@@ -13,6 +13,7 @@
       version: document.getElementById('screen-version'),
       difficulty: document.getElementById('screen-difficulty'),
       settings: document.getElementById('screen-settings'),
+      records: document.getElementById('screen-records'),
       exit: document.getElementById('screen-exit'),
     };
 
@@ -28,6 +29,8 @@
     this.btnNew = document.getElementById('menu-new');
     this.btnContinue = document.getElementById('menu-continue');
     this.btnSettings = document.getElementById('menu-settings-btn');
+    this.btnRecords = document.getElementById('menu-records');
+    this.recordsBody = document.getElementById('records-body');
     this.btnExport = document.getElementById('menu-export');
     this.btnImport = document.getElementById('menu-import');
     this.msgEl = document.getElementById('menu-message');
@@ -40,6 +43,7 @@
     this.btnBackVersion = document.getElementById('back-from-version');
     this.btnBackDiff = document.getElementById('back-from-difficulty');
     this.btnBackSettings = document.getElementById('back-from-settings');
+    this.btnBackRecords = document.getElementById('back-from-records');
     this.btnBackExit = document.getElementById('back-from-exit');
 
     this.selSpeed = document.getElementById('set-speed');
@@ -132,25 +136,59 @@
     ctx.fill();
   };
 
+  // Rebuilt every time the screen is shown — unlocks can change mid-session
+  // (e.g. just won on Hard, Nightmare should light up without a reload).
   Menu.prototype.buildDifficultyButtons = function () {
     const ids = Object.keys(this.opts.difficulties || {});
     this.diffButtons.innerHTML = '';
     ids.forEach((id) => {
       const diff = this.opts.difficulties[id];
+      const unlocked = !this.opts.isDifficultyUnlocked || this.opts.isDifficultyUnlocked(id);
       const btn = document.createElement('button');
-      btn.className = 'diff-btn';
+      btn.className = 'diff-btn' + (unlocked ? '' : ' locked');
       btn.setAttribute('data-diff', id);
-      btn.innerHTML = '<strong>' + diff.name + '</strong><span>' + diff.desc + '</span>';
-      btn.addEventListener('click', () => {
-        this.close();
-        this.opts.onNewGame(id, this.pendingVersionId);
-      });
+      if (unlocked) {
+        btn.innerHTML = '<strong>' + diff.name + '</strong><span>' + diff.desc + '</span>';
+        btn.addEventListener('click', () => {
+          this.close();
+          this.opts.onNewGame(id, this.pendingVersionId);
+        });
+      } else {
+        btn.disabled = true;
+        const need = this.opts.difficulties[diff.unlockedBy];
+        btn.innerHTML = '<strong>🔒 ' + diff.name + '</strong><span>Откроется после победы на «' +
+          (need ? need.name : diff.unlockedBy) + '»</span>';
+      }
       this.diffButtons.appendChild(btn);
     });
   };
 
+  // Compact leaderboard: one block per version x difficulty that has records.
+  Menu.prototype.buildRecords = function () {
+    if (!this.recordsBody || !this.opts.getRecords) return;
+    const versionIds = this.opts.versionOrder || Object.keys(this.opts.versions || {});
+    const diffIds = Object.keys(this.opts.difficulties || {});
+    let html = '';
+    for (const vId of versionIds) {
+      const vName = (this.opts.versions[vId] || {}).name || vId;
+      for (const dId of diffIds) {
+        const list = this.opts.getRecords(vId, dId) || [];
+        if (list.length === 0) continue;
+        const dName = (this.opts.difficulties[dId] || {}).name || dId;
+        const rows = list.map((r, i) =>
+          `<tr><td>${i + 1}</td><td>${r.wave}</td><td>${r.lives}</td><td>${r.gold}</td>` +
+          `<td>${r.won ? 'Победа' : 'Пал'}</td></tr>`).join('');
+        html += `<div class="records-group"><div class="records-title">${vName} · ${dName}</div>` +
+          `<table class="records-table"><tr><th>#</th><th>Волна</th><th>Жизни</th><th>Золото</th><th>Итог</th></tr>${rows}</table></div>`;
+      }
+    }
+    this.recordsBody.innerHTML = html || '<div class="muted">Пока нет завершённых забегов.</div>';
+  };
+
   Menu.prototype.bind = function () {
     this.btnNew.addEventListener('click', () => this.show('version'));
+    if (this.btnRecords) this.btnRecords.addEventListener('click', () => this.show('records'));
+    if (this.btnBackRecords) this.btnBackRecords.addEventListener('click', () => this.show(this.prevScreen || 'main'));
     this.btnContinue.addEventListener('click', () => {
       if (!this.opts.hasSave()) return;
       this.close();
@@ -242,7 +280,11 @@
   };
 
   Menu.prototype.show = function (name) {
-    if (name === 'settings') this.prevScreen = this.currentScreen || (this.mode === 'pause' ? 'pause' : 'main');
+    if (name === 'settings' || name === 'records') {
+      this.prevScreen = this.currentScreen || (this.mode === 'pause' ? 'pause' : 'main');
+    }
+    if (name === 'difficulty') this.buildDifficultyButtons();
+    if (name === 'records') this.buildRecords();
     Object.keys(this.screens).forEach((key) => {
       this.screens[key].classList.toggle('hidden', key !== name);
     });
