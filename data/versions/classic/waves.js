@@ -1,7 +1,8 @@
-// Waves config: 36 waves in three acts (bosses at 12/24/36).
+// Classic waves: 36 waves in three acts (bosses at 12/24/36).
 // Special flags: immuneToSlow, regen (hp/sec), hero (mini-boss), extra (bonus
 // wave: escapes cost no lives, kills pay double), boss.
-const WavesConfig = [
+globalThis.ClassicVersion = globalThis.ClassicVersion || {};
+ClassicVersion.waves = [
   // ---- Акт I (1–12)
   { name: 'Разведчики', bonus: 12, groups: [{ creep: 'walker', count: 10, interval: 1.0, hp: 40, bounty: 2 }] },
   { name: 'Налётчики', bonus: 14, groups: [{ creep: 'walker', count: 12, interval: 0.9, hp: 58, bounty: 2 }] },

@@ -3,7 +3,7 @@
 body {
   background: #100e07;
   color: #eae3c8;
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 14px;
   min-height: 100vh;
   display: flex;
@@ -180,6 +180,25 @@ button.active { background: #6b5d1f; border-color: #e6c832; }
 .diff-btn .dname { font-size: 16px; font-weight: 700; color: #e6c832; }
 .diff-btn .ddesc { font-size: 12px; color: #eae3c8; }
 .diff-btn .dstats { font-size: 11px; color: #a89e75; }
+
+/* Version-select screen needs a wider card for the route previews. */
+.menu-card:has(#screen-version:not(.hidden)) { width: 560px; }
+#version-cards { display: flex; flex-direction: column; gap: 10px; }
+.version-card {
+  display: flex; gap: 12px; align-items: center;
+  text-align: left; padding: 10px;
+}
+.version-preview {
+  flex: 0 0 auto;
+  border: 1px solid rgba(214, 177, 74, 0.35);
+  border-radius: 6px;
+  background: #17150c;
+}
+.version-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.version-info strong { font-size: 16px; color: #e6c832; }
+.version-info .vdesc { font-size: 12px; color: #eae3c8; white-space: normal; }
+.version-info .vmeta { font-size: 11px; color: #a89e75; }
+.version-info .vtowers { font-size: 10px; color: #a89e75; white-space: normal; }
 
 .set-row {
   display: flex; justify-content: space-between; align-items: center; gap: 10px;

@@ -1,6 +1,6 @@
-// Map config: defines battlefield size and creep route for YellowTD.
-// YellowTD v2 desert battlefield inspired by classic Warcraft 3 TD flow.
-const MapConfig = {
+// Classic map: the original YellowTD desert battlefield (serpentine road).
+globalThis.ClassicVersion = globalThis.ClassicVersion || {};
+ClassicVersion.map = {
   cols: 24,
   rows: 18,
   cellSize: 36,

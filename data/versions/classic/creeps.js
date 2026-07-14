@@ -1,5 +1,6 @@
-// Creeps config: base enemy archetypes used by waves and simulation.
-const CreepsConfig = {
+// Classic creeps: base enemy archetypes used by waves and simulation.
+globalThis.ClassicVersion = globalThis.ClassicVersion || {};
+ClassicVersion.creeps = {
   walker: { name: 'Пустынный бродяга', type: 'ground', speed: 60, radius: 9, livesCost: 1, color: '#d8b75b' },
   sprinter: { name: 'Песчаный бегун', type: 'ground', speed: 105, radius: 7, livesCost: 1, color: '#f0e18e' },
   bulwark: { name: 'Барханный громила', type: 'ground', speed: 42, radius: 12, livesCost: 1, color: '#a37b28' },

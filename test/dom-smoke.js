@@ -1,0 +1,312 @@
+// Headless integration smoke: loads ALL scripts (data + engine + render + ui + main)
+// with stubbed DOM/Canvas and simulates user interaction: menu flow, difficulty
+// selection, building, pause menu, save/continue and settings.
+// Run: node test/dom-smoke.js
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+// ------------------------------------------------------------------- stubs
+
+function makeCtx() {
+  const store = {};
+  // Callable, chainable absorber: any method returns it, any property is it.
+  const blackhole = new Proxy(function () {}, {
+    get: (t, p) => (p === Symbol.toPrimitive ? () => 0 : blackhole),
+    set: () => true,
+    apply: () => blackhole,
+  });
+  return new Proxy({}, {
+    get: (t, p) => (p in store ? store[p] : blackhole),
+    set: (t, p, v) => { store[p] = v; return true; },
+  });
+}
+
+class FakeElement {
+  constructor(tag) {
+    this.tag = tag;
+    this.children = [];
+    this.dataset = {};
+    this.style = {};
+    this.attrs = {};
+    this.disabled = false;
+    this.checked = false;
+    this.value = '';
+    this.textContent = '';
+    this._html = '';
+    this._handlers = {};
+    const set = new Set();
+    this.classList = {
+      add: (...c) => c.forEach(x => set.add(x)),
+      remove: (...c) => c.forEach(x => set.delete(x)),
+      contains: c => set.has(c),
+      toggle: (c, force) => {
+        const want = force !== undefined ? force : !set.has(c);
+        if (want) set.add(c); else set.delete(c);
+      },
+    };
+  }
+  get innerHTML() { return this._html; }
+  set innerHTML(v) { this._html = String(v); }
+  setAttribute(k, v) { this.attrs[k] = String(v); }
+  getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+  addEventListener(type, fn) { (this._handlers[type] = this._handlers[type] || []).push(fn); }
+  appendChild(el) { this.children.push(el); return el; }
+  querySelectorAll() { return []; }
+  getBoundingClientRect() {
+    return { left: 0, top: 0, width: this.width || 100, height: this.height || 100 };
+  }
+  getContext() { return makeCtx(); }
+  fire(type, ev = {}) {
+    for (const fn of this._handlers[type] || []) fn(Object.assign({ preventDefault() {} }, ev));
+  }
+}
+
+const elements = {};
+const documentStub = new FakeElement('document');
+documentStub.getElementById = id => (elements[id] = elements[id] || new FakeElement('div'));
+documentStub.createElement = tag => new FakeElement(tag);
+
+let rafCb = null;
+let nowMs = 0;
+const windowStub = {
+  innerWidth: 1400,
+  innerHeight: 900,
+  addEventListener: () => {},
+  close: () => {},
+};
+
+const ctx = vm.createContext({
+  document: documentStub,
+  window: windowStub,
+  performance: { now: () => nowMs },
+  requestAnimationFrame: cb => { rafCb = cb; },
+  setTimeout: fn => { fn(); return 0; },
+  clearTimeout: () => {},
+  console,
+});
+
+// ------------------------------------------------------------------- load
+
+const root = path.join(__dirname, '..');
+const files = [
+  'data/config.js',
+  'data/versions/classic/map.js', 'data/versions/classic/creeps.js',
+  'data/versions/classic/towers.js', 'data/versions/classic/waves.js',
+  'data/versions/canyon/map.js', 'data/versions/canyon/creeps.js',
+  'data/versions/canyon/towers.js', 'data/versions/canyon/waves.js',
+  'data/versions.js',
+  'engine/path.js', 'engine/sim.js', 'render/renderer.js',
+  'ui/storage.js', 'ui/platform.js', 'ui/menu.js', 'ui/ui.js', 'main.js',
+];
+
+let failures = 0;
+function check(label, cond, extra) {
+  console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${extra ? ' — ' + extra : ''}`);
+  if (!cond) failures++;
+}
+
+for (const f of files) {
+  vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
+}
+
+const YTD = windowStub.YTD;
+check('bootstrap: YTD handle exists', !!YTD);
+check('bootstrap: starts in main menu',
+  YTD.app.state === 'menu' && !elements['menu'].classList.contains('hidden') &&
+  !elements['screen-main'].classList.contains('hidden'));
+check('bootstrap: canvas sized from MapConfig (24x18 @36)',
+  elements['game-canvas'].width === 864 && elements['game-canvas'].height === 648,
+  `${elements['game-canvas'].width}x${elements['game-canvas'].height}`);
+check('bootstrap: 7 build buttons, 3 difficulty buttons',
+  Object.keys(YTD.ui.buildBtns).length === 7 && elements['diff-buttons'].children.length === 3);
+check('bootstrap: continue disabled without a save', elements['menu-continue'].disabled === true);
+
+function runFrames(n, stepMs = 50) {
+  for (let i = 0; i < n; i++) {
+    const cb = rafCb;
+    rafCb = null;
+    nowMs += stepMs;
+    cb(nowMs);
+    if (!rafCb) throw new Error('frame loop stopped rescheduling');
+  }
+}
+
+// ------------------------------------------------------------ interaction
+
+try {
+  runFrames(10); // idle menu frames (drawIdle)
+
+  // menu: New Game -> version screen -> Classic -> difficulty -> Normal (2nd button)
+  elements['menu-new'].fire('click');
+  check('New Game opens version screen',
+    !elements['screen-version'].classList.contains('hidden') &&
+    elements['screen-main'].classList.contains('hidden'));
+  check('version screen shows both version cards',
+    elements['version-cards'].children.length === 2 &&
+    elements['version-cards'].children[0].getAttribute('data-version') === 'classic' &&
+    elements['version-cards'].children[1].getAttribute('data-version') === 'canyon');
+  elements['version-cards'].children[0].fire('click');
+  check('version card click opens difficulty screen',
+    !elements['screen-difficulty'].classList.contains('hidden') &&
+    elements['screen-version'].classList.contains('hidden'));
+  elements['diff-buttons'].children[1].fire('click');
+  check('difficulty click starts the game',
+    YTD.app.state === 'playing' && !!YTD.sim && elements['menu'].classList.contains('hidden'),
+    `state=${YTD.app.state}`);
+  check('normal difficulty resources', YTD.sim.state.gold === 60 && YTD.sim.state.lives === 30,
+    `gold=${YTD.sim.state.gold}, lives=${YTD.sim.state.lives}`);
+
+  runFrames(20);
+  check('frame loop runs and HUD updates', elements['gold-value'].innerHTML === '60',
+    `gold-value="${elements['gold-value'].innerHTML}"`);
+
+  const canvas = elements['game-canvas'];
+  // pick arrow tower via its button, place at cell (7,3) => px (270,126)
+  YTD.ui.buildBtns.arrow.fire('click');
+  check('build button click enters placing mode', YTD.ui.placingType === 'arrow');
+  canvas.fire('mousemove', { clientX: 270, clientY: 126 });
+  canvas.fire('click', { clientX: 270, clientY: 126, shiftKey: false });
+  check('canvas click builds tower', YTD.sim.state.towers.length === 1 && YTD.sim.state.gold === 48,
+    `towers=${YTD.sim.state.towers.length}, gold=${YTD.sim.state.gold}`);
+
+  canvas.fire('click', { clientX: 270, clientY: 126, shiftKey: false });
+  check('clicking tower selects it', YTD.ui.selectedTowerId === YTD.sim.state.towers[0].id);
+  runFrames(5);
+  check('info panel shows selected tower (RU)', elements['info-panel'].innerHTML.includes('Песчаная башня'));
+
+  documentStub.fire('keydown', { code: 'Escape', key: 'Escape' });
+  check('Escape clears selection', YTD.ui.selectedTowerId === null);
+
+  // Escape again -> pause menu (autosaves)
+  documentStub.fire('keydown', { code: 'Escape', key: 'Escape' });
+  check('Escape opens pause menu', YTD.app.state === 'menu' && YTD.app.menuMode === 'pause' &&
+    !elements['screen-pause'].classList.contains('hidden'));
+  elements['menu-resume'].fire('click');
+  check('Resume returns to the game', YTD.app.state === 'playing');
+
+  // Main menu -> Continue restores the saved session
+  YTD.app.openMainMenu();
+  check('main menu shows with continue enabled',
+    !elements['screen-main'].classList.contains('hidden') && elements['menu-continue'].disabled === false);
+  elements['menu-continue'].fire('click');
+  check('Continue resumes the session',
+    YTD.app.state === 'playing' && YTD.sim.state.gold === 48 && YTD.sim.state.towers.length === 1,
+    `gold=${YTD.sim.state.gold}, towers=${YTD.sim.state.towers.length}`);
+
+  // mass actions via the selected-tower panel (0.6.0)
+  YTD.ui.buildBtns.arrow.fire('click');
+  canvas.fire('click', { clientX: 306, clientY: 126, shiftKey: false }); // build 2nd at (8,3)
+  canvas.fire('click', { clientX: 270, clientY: 126, shiftKey: false }); // select (7,3)
+  runFrames(3);
+  check('panel offers mass actions', elements['info-panel'].innerHTML.includes('Улучшить все (2)'),
+    'html len ' + elements['info-panel'].innerHTML.length);
+  elements['sell-all-btn'].fire('click');
+  runFrames(2);
+  check('sell-all removes all towers of the type',
+    YTD.sim.state.towers.length === 0 && YTD.sim.state.gold === 52,
+    `towers=${YTD.sim.state.towers.length}, gold=${YTD.sim.state.gold}`);
+
+  // run wave 1 at max speed
+  YTD.loop.speed = 3;
+  const goldBefore = YTD.sim.state.gold;
+  YTD.sim.startWave();
+  let frames = 0;
+  while (YTD.sim.state.phase === 'wave' && frames < 8000) { runFrames(1); frames++; }
+  check('wave 1 completes', YTD.sim.state.phase === 'build' && YTD.sim.state.waveIndex === 1,
+    `phase=${YTD.sim.state.phase}, lives=${YTD.sim.state.lives}`);
+  check('income received (kills + bonus)', YTD.sim.state.gold > goldBefore,
+    `gold ${goldBefore} -> ${YTD.sim.state.gold}`);
+  runFrames(10);
+
+  // settings: turning floating text off reaches the renderer and persists
+  elements['set-floating'].checked = false;
+  elements['set-floating'].fire('change');
+  check('settings change applies to renderer', YTD.renderer.showFloatingText === false);
+  check('settings change persists in settings object', YTD.settings.floatingText === false);
+
+  // pause toggle
+  elements['pause-btn'].fire('click');
+  check('pause toggles', YTD.loop.paused === true);
+  runFrames(5);
+  elements['pause-btn'].fire('click');
+
+  // --- 0.8.0: canyon version — separate map, towers and save slot ---
+  YTD.app.openMainMenu();
+  elements['menu-new'].fire('click');
+  elements['version-cards'].children[1].fire('click'); // canyon
+  elements['diff-buttons'].children[1].fire('click');  // normal
+  check('canyon game starts', YTD.app.state === 'playing' && YTD.versionId === 'canyon',
+    `state=${YTD.app.state}, version=${YTD.versionId}`);
+  check('canvas resized for the canyon map (20x20 @36)',
+    elements['game-canvas'].width === 720 && elements['game-canvas'].height === 720,
+    `${elements['game-canvas'].width}x${elements['game-canvas'].height}`);
+  check('canyon sim uses its own configs',
+    YTD.sim.map.cols === 20 && YTD.sim.waves.length === 24);
+  check('build panel swapped to canyon towers (6, storm, no sniper)',
+    Object.keys(YTD.ui.buildBtns).length === 6 &&
+    'storm' in YTD.ui.buildBtns && !('sniper' in YTD.ui.buildBtns));
+  runFrames(10);
+  const classicSave = YTD.Storage.loadGame('classic');
+  const canyonSave = YTD.Storage.loadGame('canyon');
+  check('saves live in separate per-version slots',
+    !!(classicSave && classicSave.state) && !!(canyonSave && canyonSave.state) &&
+    classicSave.versionId === 'classic' && canyonSave.versionId === 'canyon');
+
+  // continue button reports which save is the most recent one
+  YTD.app.openMainMenu();
+  check('continue caption mentions the saved version',
+    String(elements['menu-continue'].textContent).includes('Каньон'),
+    elements['menu-continue'].textContent);
+  elements['menu-continue'].fire('click');
+  check('continue restores the canyon session',
+    YTD.app.state === 'playing' && YTD.versionId === 'canyon' && YTD.sim.map.cols === 20);
+
+  // menu button -> pause screen; exit lives on the main screen
+  elements['menu-btn'].fire('click');
+  check('Menu button opens pause menu', YTD.app.state === 'menu' && YTD.app.menuMode === 'pause');
+  elements['menu-to-main'].fire('click');
+  check('To main menu switches mode', YTD.app.menuMode === 'main');
+  elements['menu-exit'].fire('click');
+
+  // --- 0.7.0: platform layer, async exit, save export/import ---
+  (async () => {
+    try {
+      await new Promise(r => setImmediate(r));
+      check('Exit shows farewell screen (async fallback)',
+        !elements['screen-exit'].classList.contains('hidden'));
+      check('platform: browser mode in tests',
+        windowStub.Platform && windowStub.Platform.isTauri() === false);
+      const save = YTD.Storage.loadGame('canyon');
+      check('autosave exists for export', !!(save && save.state && save.versionId === 'canyon'));
+      check('export button enabled with save', elements['menu-export'].disabled === false);
+      YTD.Storage.clearGame('classic');
+      YTD.Storage.clearGame('canyon');
+      YTD.menu.refresh();
+      check('continue disabled after clearing saves', elements['menu-continue'].disabled === true);
+      windowStub.Platform.importText = async () =>
+        JSON.stringify(Object.assign({}, save, { version: '0.0.1' }));
+      elements['menu-import'].fire('click');
+      await new Promise(r => setImmediate(r));
+      check('import rejects wrong version',
+        !YTD.Storage.loadGame('canyon') && (elements['menu-message'].textContent || '').length > 0,
+        elements['menu-message'].textContent);
+      windowStub.Platform.importText = async () => JSON.stringify(save);
+      elements['menu-import'].fire('click');
+      await new Promise(r => setImmediate(r));
+      const restored = YTD.Storage.loadGame('canyon');
+      check('import restores save into its version slot and enables continue',
+        !!restored && restored.version === save.version && restored.versionId === 'canyon' &&
+        elements['menu-continue'].disabled === false);
+    } catch (err2) {
+      console.error('[FAIL] async platform tests:', err2);
+      failures++;
+    }
+    console.log(failures === 0 ? '\nAll DOM smoke tests passed.' : `\n${failures} test(s) FAILED.`);
+    process.exit(failures === 0 ? 0 : 1);
+  })();
+} catch (err) {
+  console.error('[FAIL] uncaught error during interaction:', err);
+  process.exit(1);
+}

@@ -10,6 +10,7 @@
     this.screens = {
       main: document.getElementById('screen-main'),
       pause: document.getElementById('screen-pause'),
+      version: document.getElementById('screen-version'),
       difficulty: document.getElementById('screen-difficulty'),
       settings: document.getElementById('screen-settings'),
       exit: document.getElementById('screen-exit'),
@@ -18,6 +19,7 @@
     this.mode = 'main';
     this.prevScreen = 'main';
     this.currentScreen = 'main';
+    this.pendingVersionId = null; // set on the version screen, used by difficulty
 
     this.btnNew = document.getElementById('menu-new');
     this.btnContinue = document.getElementById('menu-continue');
@@ -31,6 +33,7 @@
     this.btnPauseSettings = document.getElementById('menu-pause-settings');
     this.btnToMain = document.getElementById('menu-to-main');
 
+    this.btnBackVersion = document.getElementById('back-from-version');
     this.btnBackDiff = document.getElementById('back-from-difficulty');
     this.btnBackSettings = document.getElementById('back-from-settings');
     this.btnBackExit = document.getElementById('back-from-exit');
@@ -41,12 +44,85 @@
     this.chkRange = document.getElementById('set-range');
 
     this.diffButtons = document.getElementById('diff-buttons');
+    this.versionCards = document.getElementById('version-cards');
+    this.buildVersionCards();
     this.buildDifficultyButtons();
     this.bind();
     this.syncSettings();
     this.refresh();
     this.show('main');
   }
+
+  // Version cards: name, description, waves count, tower roster, route preview.
+  Menu.prototype.buildVersionCards = function () {
+    const ids = this.opts.versionOrder || Object.keys(this.opts.versions || {});
+    this.versionCards.innerHTML = '';
+    ids.forEach((id) => {
+      const v = this.opts.versions[id];
+      const card = document.createElement('button');
+      card.className = 'version-card';
+      card.setAttribute('data-version', id);
+      const preview = document.createElement('canvas');
+      preview.className = 'version-preview';
+      preview.width = 168;
+      preview.height = 140;
+      const towerNames = Object.values(v.towers).map(t => t.name).join(', ');
+      const info = document.createElement('span');
+      info.className = 'version-info';
+      info.innerHTML = '<strong>' + v.name + '</strong>' +
+        '<span class="vdesc">' + v.desc + '</span>' +
+        '<span class="vmeta">Волн: ' + v.waves.length +
+        ' · Башен: ' + Object.keys(v.towers).length + '</span>' +
+        '<span class="vtowers">' + towerNames + '</span>';
+      card.appendChild(preview);
+      card.appendChild(info);
+      card.addEventListener('click', () => {
+        this.pendingVersionId = id;
+        this.show('difficulty');
+      });
+      this.versionCards.appendChild(card);
+      this._drawRoutePreview(preview, v.map);
+    });
+  };
+
+  // Mini route preview: scaled-down board with the creep path polyline.
+  Menu.prototype._drawRoutePreview = function (canvasEl, map) {
+    if (!canvasEl.getContext) return;
+    const ctx = canvasEl.getContext('2d');
+    if (!ctx) return;
+    const w = canvasEl.width;
+    const h = canvasEl.height;
+    const s = Math.min(w / map.cols, h / map.rows);
+    const ox = (w - map.cols * s) / 2;
+    const oy = (h - map.rows * s) / 2;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#1c1309';
+    ctx.fillRect(ox, oy, map.cols * s, map.rows * s);
+    ctx.strokeStyle = 'rgba(255,220,132,0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ox + 0.5, oy + 0.5, map.cols * s - 1, map.rows * s - 1);
+    const px = wp => ox + (wp.col + 0.5) * s;
+    const py = wp => oy + (wp.row + 0.5) * s;
+    ctx.strokeStyle = '#d8b14a';
+    ctx.lineWidth = Math.max(2, s * 0.6);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    const wps = map.waypoints;
+    ctx.moveTo(px(wps[0]), py(wps[0]));
+    for (let i = 1; i < wps.length; i++) ctx.lineTo(px(wps[i]), py(wps[i]));
+    ctx.stroke();
+    // entry / exit markers
+    ctx.fillStyle = '#e6c832';
+    ctx.beginPath();
+    ctx.arc(Math.max(ox + 2, px(wps[0])), py(wps[0]), 3, 0, Math.PI * 2);
+    ctx.fill();
+    const last = wps[wps.length - 1];
+    ctx.fillStyle = '#c0392b';
+    ctx.beginPath();
+    ctx.arc(Math.min(ox + map.cols * s - 2, px(last)), py(last), 3, 0, Math.PI * 2);
+    ctx.fill();
+  };
 
   Menu.prototype.buildDifficultyButtons = function () {
     const ids = Object.keys(this.opts.difficulties || {});
@@ -59,14 +135,14 @@
       btn.innerHTML = '<strong>' + diff.name + '</strong><span>' + diff.desc + '</span>';
       btn.addEventListener('click', () => {
         this.close();
-        this.opts.onNewGame(id);
+        this.opts.onNewGame(id, this.pendingVersionId);
       });
       this.diffButtons.appendChild(btn);
     });
   };
 
   Menu.prototype.bind = function () {
-    this.btnNew.addEventListener('click', () => this.show('difficulty'));
+    this.btnNew.addEventListener('click', () => this.show('version'));
     this.btnContinue.addEventListener('click', () => {
       if (!this.opts.hasSave()) return;
       this.close();
@@ -98,7 +174,8 @@
       this.opts.onMainMenu();
     });
 
-    this.btnBackDiff.addEventListener('click', () => this.show(this.mode === 'pause' ? 'pause' : 'main'));
+    this.btnBackVersion.addEventListener('click', () => this.show(this.mode === 'pause' ? 'pause' : 'main'));
+    this.btnBackDiff.addEventListener('click', () => this.show('version'));
     this.btnBackSettings.addEventListener('click', () => this.show(this.prevScreen || (this.mode === 'pause' ? 'pause' : 'main')));
     this.btnBackExit.addEventListener('click', () => this.show('main'));
 
@@ -126,6 +203,11 @@
   Menu.prototype.refresh = function () {
     const canContinue = !!this.opts.hasSave();
     this.btnContinue.disabled = !canContinue;
+    // Show which map version (and difficulty) the save belongs to.
+    const info = canContinue && this.opts.continueInfo ? this.opts.continueInfo() : null;
+    this.btnContinue.textContent = info
+      ? 'Продолжить — ' + info.versionName + ' · ' + info.difficultyName
+      : 'Продолжить';
     if (this.btnExport) this.btnExport.disabled = !canContinue;
     if (this.btnResume) this.btnResume.disabled = this.mode !== 'pause';
   };

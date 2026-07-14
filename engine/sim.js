@@ -351,6 +351,8 @@ class Simulation {
           slowDuration: lvl.slowDuration || 0,
           poisonDps: lvl.poisonDps || 0,
           poisonDuration: lvl.poisonDuration || 0,
+          chain: lvl.chain || 0,
+          chainRange: lvl.chainRange || 0,
           targets: def.targets,
           typeId: t.typeId,
           towerId: t.id,
@@ -397,6 +399,39 @@ class Simulation {
       }
     } else if (target) {
       this._damage(target, p);
+      if (p.chain > 0) this._chainJumps(p, target);
+    }
+  }
+
+  // Chain lightning: after the first hit the bolt jumps to the nearest
+  // not-yet-hit valid creep within chainRange, losing 30% damage per jump.
+  // Nearest-target choice is deterministic (strict < keeps array order on ties).
+  _chainJumps(p, firstTarget) {
+    const s = this.state;
+    const hitIds = new Set([firstTarget.id]);
+    let from = { id: firstTarget.id, x: firstTarget.x, y: firstTarget.y };
+    let damage = p.damage;
+    const r2 = p.chainRange * p.chainRange;
+    for (let jump = 0; jump < p.chain; jump++) {
+      damage = Math.max(1, Math.round(damage * 0.7));
+      let best = null;
+      let bestD2 = Infinity;
+      for (const c of s.creeps) {
+        if (hitIds.has(c.id)) continue;
+        if (!p.targets.includes(c.type)) continue;
+        const dx = c.x - from.x;
+        const dy = c.y - from.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 <= r2 && d2 < bestD2) {
+          bestD2 = d2;
+          best = c;
+        }
+      }
+      if (!best) break;
+      s.events.push({ type: 'chainHit', fromX: from.x, fromY: from.y, toX: best.x, toY: best.y });
+      hitIds.add(best.id);
+      from = { id: best.id, x: best.x, y: best.y };
+      this._damage(best, Object.assign({}, p, { damage }));
     }
   }
 

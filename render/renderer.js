@@ -18,6 +18,14 @@ class Renderer {
     this.effects = [];
   }
 
+  // Swap in another map version's configs (canvas is resized by main.js).
+  setVersion(version) {
+    this.map = version.map;
+    this.towersCfg = version.towers;
+    this.creepsCfg = version.creeps;
+    this.effects = [];
+  }
+
   ingestEvents(events) {
     for (const ev of events) {
       if (ev.type === 'kill') {
@@ -31,6 +39,8 @@ class Renderer {
         this.effects.push({ kind: 'flash', age: 0, ttl: 0.3 });
       } else if (ev.type === 'explosion') {
         this.effects.push({ kind: 'ring', x: ev.x, y: ev.y, radius: ev.radius, age: 0, ttl: 0.35 });
+      } else if (ev.type === 'chainHit') {
+        this.effects.push({ kind: 'bolt', x1: ev.fromX, y1: ev.fromY, x2: ev.toX, y2: ev.toY, age: 0, ttl: 0.18 });
       } else if (ev.type === 'waveEnd') {
         this.effects.push({ kind: 'text', text: 'Бонус за волну +' + ev.bonus, x: this.canvas.width / 2, y: 40, color: '#e6c832', age: 0, ttl: 1.6, vy: -12, big: true });
       }
@@ -221,6 +231,10 @@ class Renderer {
         ctx.moveTo(x + off - 3, y + 4); ctx.lineTo(x + off, y - 5); ctx.lineTo(x + off + 3, y + 4);
       }
       ctx.stroke();
+    } else if (def.shape === 'storm') { // lightning bolt zigzag
+      ctx.moveTo(x + 4, y - 9); ctx.lineTo(x - 3, y - 1); ctx.lineTo(x + 2, y - 1);
+      ctx.lineTo(x - 4, y + 8);
+      ctx.stroke();
     } else { // 'cross' and fallback
       ctx.arc(x, y - 1, 6, 0, Math.PI * 2);
       ctx.moveTo(x - 9, y - 1); ctx.lineTo(x + 9, y - 1);
@@ -324,7 +338,24 @@ class Renderer {
         continue;
       }
       const k = e.age / e.ttl;
-      if (e.kind === 'ring') {
+      if (e.kind === 'bolt') {
+        // chain lightning arc: two-segment zigzag with a perpendicular kink
+        const mx = (e.x1 + e.x2) / 2;
+        const my = (e.y1 + e.y2) / 2;
+        const dx = e.x2 - e.x1;
+        const dy = e.y2 - e.y1;
+        const len = Math.hypot(dx, dy) || 1;
+        const off = 6 * (1 - k);
+        const kx = mx - (dy / len) * off;
+        const ky = my + (dx / len) * off;
+        ctx.strokeStyle = `rgba(143,208,255,${1 - k})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(e.x1, e.y1);
+        ctx.lineTo(kx, ky);
+        ctx.lineTo(e.x2, e.y2);
+        ctx.stroke();
+      } else if (e.kind === 'ring') {
         ctx.strokeStyle = `rgba(226,112,58,${1 - k})`;
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -334,7 +365,7 @@ class Renderer {
         ctx.save();
         ctx.globalAlpha = 1 - k;
         ctx.fillStyle = e.color;
-        ctx.font = e.big ? '700 18px Inter, sans-serif' : '700 12px Inter, sans-serif';
+        ctx.font = e.big ? '700 18px "Segoe UI", system-ui, sans-serif' : '700 12px "Segoe UI", system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(e.text, e.x, e.y + e.vy * e.age);
         ctx.restore();

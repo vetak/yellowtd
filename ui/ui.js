@@ -50,6 +50,15 @@ class UI {
     this._bindEvents();
   }
 
+  // Swap in another map version's configs and rebuild the build panel.
+  setVersion(version) {
+    this.towersCfg = version.towers;
+    this.creepsCfg = version.creeps;
+    this.wavesCfg = version.waves;
+    this.el['build-buttons'].innerHTML = '';
+    this._buildButtons();
+  }
+
   reset() {
     this.placingType = null;
     this.selectedTowerId = null;
@@ -248,6 +257,7 @@ class UI {
     if (lvl.slowFactor) extra.push(`замедление до ${Math.round(lvl.slowFactor * 100)}% на ${lvl.slowDuration} с`);
     if (lvl.poisonDps) extra.push(`яд ${lvl.poisonDps}/с на ${lvl.poisonDuration} с, игнорирует броню`);
     if (lvl.shots > 1) extra.push(`залп по ${lvl.shots} целям`);
+    if (lvl.chain) extra.push(`цепная молния: до ${lvl.chain + 1} целей, -30% урона за прыжок`);
     return extra;
   }
 
@@ -375,8 +385,9 @@ class UI {
     const t = this.selectedTowerId ? sim.getTower(this.selectedTowerId) : null;
     if (!t) {
       if (this.selectedTowerId) this.selectedTowerId = null;
+      const keyCount = Object.keys(this.towersCfg).length;
       this._set('info-panel',
-        `<div class="muted">Выберите башню (кнопки или клавиши 1–7) и кликните по свободной клетке.` +
+        `<div class="muted">Выберите башню (кнопки или клавиши 1–${keyCount}) и кликните по свободной клетке.` +
         ` Shift/Ctrl+клик — строить несколько подряд. Клик по построенной башне — улучшение и продажа.` +
         ` ПКМ — отмена. Пробел — пауза. Esc — меню.</div>`);
       return;

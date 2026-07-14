@@ -2,8 +2,9 @@
 // Persistence for saves and settings. Uses localStorage when available,
 // falls back to in-memory storage (private mode, headless tests).
 // Kept out of engine/ — the simulation itself knows nothing about storage.
+// Saves are stored per map version: one slot per versionId.
 const Storage = (() => {
-  const SAVE_KEY = 'yellowtd.save';
+  const SAVE_PREFIX = 'yellowtd.save.';
   const SETTINGS_KEY = 'yellowtd.settings';
 
   let backend;
@@ -41,9 +42,20 @@ const Storage = (() => {
   }
 
   return {
-    saveGame(payload) { return writeJson(SAVE_KEY, payload); },
-    loadGame() { return readJson(SAVE_KEY); },
-    clearGame() { try { backend.removeItem(SAVE_KEY); } catch (e) {} },
+    saveGame(versionId, payload) { return writeJson(SAVE_PREFIX + versionId, payload); },
+    loadGame(versionId) { return readJson(SAVE_PREFIX + versionId); },
+    clearGame(versionId) { try { backend.removeItem(SAVE_PREFIX + versionId); } catch (e) {} },
+    // Most recent save across the given version ids (for the Continue button).
+    latestSave(versionIds) {
+      let best = null;
+      for (const id of versionIds) {
+        const save = readJson(SAVE_PREFIX + id);
+        if (save && save.state && (!best || (save.savedAt || 0) > (best.savedAt || 0))) {
+          best = save;
+        }
+      }
+      return best;
+    },
     saveSettings(settings) { return writeJson(SETTINGS_KEY, settings); },
     loadSettings(defaults) {
       return Object.assign({}, defaults, readJson(SETTINGS_KEY) || {});

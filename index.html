@@ -4,9 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>YellowTD</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -79,6 +76,12 @@
       <button id="menu-to-main">Главное меню</button>
     </div>
 
+    <div id="screen-version" class="menu-screen hidden">
+      <div class="screen-title">Выбор версии карты</div>
+      <div id="version-cards"></div>
+      <button id="back-from-version" class="menu-back">Назад</button>
+    </div>
+
     <div id="screen-difficulty" class="menu-screen hidden">
       <div class="screen-title">Выбор сложности</div>
       <div id="diff-buttons"></div>
@@ -120,10 +123,15 @@
 <div id="tooltip" class="hidden"></div>
 
 <script src="data/config.js"></script>
-<script src="data/map.js"></script>
-<script src="data/creeps.js"></script>
-<script src="data/towers.js"></script>
-<script src="data/waves.js"></script>
+<script src="data/versions/classic/map.js"></script>
+<script src="data/versions/classic/creeps.js"></script>
+<script src="data/versions/classic/towers.js"></script>
+<script src="data/versions/classic/waves.js"></script>
+<script src="data/versions/canyon/map.js"></script>
+<script src="data/versions/canyon/creeps.js"></script>
+<script src="data/versions/canyon/towers.js"></script>
+<script src="data/versions/canyon/waves.js"></script>
+<script src="data/versions.js"></script>
 <script src="engine/path.js"></script>
 <script src="engine/sim.js"></script>
 <script src="render/renderer.js"></script>
