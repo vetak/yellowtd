@@ -21,6 +21,10 @@
     this.currentScreen = 'main';
     this.pendingVersionId = null; // set on the version screen, used by difficulty
 
+    // Platform-aware farewell text (browser tab vs desktop window).
+    const exitHint = document.getElementById('exit-hint');
+    if (exitHint && opts.exitHint) exitHint.textContent = opts.exitHint;
+
     this.btnNew = document.getElementById('menu-new');
     this.btnContinue = document.getElementById('menu-continue');
     this.btnSettings = document.getElementById('menu-settings-btn');

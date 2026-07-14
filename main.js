@@ -219,6 +219,9 @@
     versionOrder: VersionOrder,
     settings,
     version: GAME_VERSION,
+    exitHint: Platform.isTauri()
+      ? 'Не удалось закрыть окно автоматически. Закройте его крестиком в заголовке.'
+      : 'Браузер не даёт закрыть вкладку автоматически. Её можно закрыть вручную.',
     hasSave,
     continueInfo,
     onNewGame: startNewGame,

@@ -11,8 +11,13 @@ const Platform = (() => {
   // Close the app. Returns true if the window is actually closing.
   async function exitApp() {
     if (tauri) {
+      const win = window.__TAURI__.window.getCurrentWindow();
       try {
-        await window.__TAURI__.window.getCurrentWindow().close();
+        await win.close(); // graceful: fires close event
+        return true;
+      } catch (e) { /* fall through to destroy */ }
+      try {
+        await win.destroy(); // hard close if close() is not permitted
         return true;
       } catch (e) {
         return false;
