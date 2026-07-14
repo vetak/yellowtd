@@ -42,7 +42,8 @@ class Renderer {
       } else if (ev.type === 'chainHit') {
         this.effects.push({ kind: 'bolt', x1: ev.fromX, y1: ev.fromY, x2: ev.toX, y2: ev.toY, age: 0, ttl: 0.18 });
       } else if (ev.type === 'waveEnd') {
-        this.effects.push({ kind: 'text', text: 'Бонус за волну +' + ev.bonus, x: this.canvas.width / 2, y: 40, color: '#e6c832', age: 0, ttl: 1.6, vy: -12, big: true });
+        const label = ev.early ? 'Досрочный бонус +' : 'Бонус за волну +';
+        this.effects.push({ kind: 'text', text: label + ev.bonus, x: this.canvas.width / 2, y: 40, color: '#e6c832', age: 0, ttl: 1.6, vy: -12, big: true });
       }
     }
   }

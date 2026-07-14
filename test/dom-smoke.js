@@ -202,7 +202,10 @@ try {
     // Panel keeps the same structure in both phases, so nothing below it jumps.
     // Drive the UI directly: stepping the sim with an empty field would end the
     // wave immediately and flip the phase back before we could look at it.
+    // The panel now keys off liveWaves (not the phase string) since that's
+    // the engine's actual source of truth for "what's currently in flight".
     YTD.sim.state.phase = 'wave';
+    YTD.sim.state.liveWaves = [{ index: 3, startedAt: YTD.sim.state.time, bonusMul: 0 }];
     YTD.ui.update(YTD.sim);
     const waveHtml = elements['wave-name'].innerHTML;
     check('wave phase keeps both the current and the upcoming wave sections',
@@ -211,7 +214,67 @@ try {
     // Restore the exact pre-block state (the checks below expect wave 1 / 60 gold).
     YTD.sim.state.waveIndex = 0;
     YTD.sim.state.phase = 'build';
+    YTD.sim.state.liveWaves = [];
     YTD.sim.state.gold = 60;
+    runFrames(2);
+  }
+
+  // --- 1.1.0 "Темп волн": early wave send with a decaying gold bonus ---
+  {
+    elements['send-wave-btn'].fire('click');
+    check('first wave starts via the button', YTD.sim.state.liveWaves.length === 1,
+      JSON.stringify(YTD.sim.state.liveWaves));
+
+    YTD.ui.update(YTD.sim);
+    check('button is disabled and counts down before the early-send window opens',
+      elements['send-wave-btn'].disabled === true &&
+      elements['send-wave-btn'].textContent.includes('Досрочно через'),
+      elements['send-wave-btn'].textContent);
+    check('clicking while still on cooldown does nothing (still one live wave)', (() => {
+      elements['send-wave-btn'].fire('click');
+      return YTD.sim.state.liveWaves.length === 1;
+    })());
+
+    // Step the sim directly (not through real time) past earlyWaveMinDelay.
+    const ticksToUnlock = Math.ceil(YTD.sim.cfg.earlyWaveMinDelay / YTD.sim.dt) + 1;
+    for (let i = 0; i < ticksToUnlock; i++) YTD.sim.step();
+    YTD.ui.update(YTD.sim);
+    check('button unlocks with a bonus percentage once the delay has passed',
+      elements['send-wave-btn'].disabled === false &&
+      /Отправить досрочно \(\+\d+%\)/.test(elements['send-wave-btn'].textContent),
+      elements['send-wave-btn'].textContent);
+
+    const goldBefore = YTD.sim.state.gold;
+    elements['send-wave-btn'].fire('click');
+    check('early send succeeds: two waves now live', YTD.sim.state.liveWaves.length === 2,
+      JSON.stringify(YTD.sim.state.liveWaves));
+
+    elements['send-wave-btn'].fire('click');
+    YTD.ui.update(YTD.sim);
+    check('a third send is rejected once two waves are already live',
+      (elements['message'].innerHTML || '').length > 0 && YTD.sim.state.liveWaves.length === 2,
+      elements['message'].innerHTML);
+
+    // Clear the field to resolve both waves and verify the combined payout.
+    YTD.sim.state.creeps = [];
+    YTD.sim.state.spawns = [];
+    YTD.sim.step();
+    YTD.ui.update(YTD.sim);
+    check('both waves resolve once the field is cleared and the player is paid for both',
+      YTD.sim.state.liveWaves.length === 0 && YTD.sim.state.gold > goldBefore,
+      `live=${YTD.sim.state.liveWaves.length}, gold ${goldBefore}->${YTD.sim.state.gold}`);
+    check('button returns to normal once nothing is live',
+      elements['send-wave-btn'].disabled === false &&
+      elements['send-wave-btn'].textContent === 'Отправить волну',
+      elements['send-wave-btn'].textContent);
+
+    // Restore a clean build-phase state for the rest of the suite.
+    YTD.sim.state.waveIndex = 0;
+    YTD.sim.state.liveWaves = [];
+    YTD.sim.state.phase = 'build';
+    YTD.sim.state.gold = 60;
+    YTD.sim.state.creeps = [];
+    YTD.sim.state.spawns = [];
     runFrames(2);
   }
 

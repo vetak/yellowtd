@@ -708,5 +708,112 @@ check('canyon: save/restore at wave 8 → identical outcome',
     fp > bp * 1.8, `base ${bp}, fast ${fp}`);
 }
 
+// ==================================================== 1.1.0 "Темп волн"
+
+// Basic gating: can't early-send before earlyWaveMinDelay, and never more
+// than maxConcurrentWaves waves in flight at once.
+{
+  const sim = newSim();
+  const r0 = sim.startWave();
+  check('wave 1 starts normally', r0.ok && !r0.early);
+  const rTooSoon = sim.startWave();
+  check('early send rejected before earlyWaveMinDelay', !rTooSoon.ok && rTooSoon.error === 'notyet');
+  for (let i = 0; i < E.GameConfig.earlyWaveMinDelay * E.GameConfig.tickRate; i++) sim.step();
+  const rEarly = sim.startWave();
+  check('early send accepted once the delay has passed', rEarly.ok && rEarly.early,
+    JSON.stringify(rEarly));
+  check('two waves are now live', sim.state.liveWaves.length === 2,
+    JSON.stringify(sim.state.liveWaves));
+  const rThird = sim.startWave();
+  check('a third send is rejected while two are already live',
+    !rThird.ok && rThird.error === 'toomanywaves');
+}
+
+// Bonus decay: sent right at unlock = max bonus; sent well past the window = ~0.
+{
+  const early = newSim();
+  early.startWave();
+  for (let i = 0; i < E.GameConfig.earlyWaveMinDelay * E.GameConfig.tickRate; i++) early.step();
+  const rMax = early.startWave();
+  check('bonus is at its max right when the window unlocks',
+    Math.abs(rMax.bonusMul - E.GameConfig.earlyWaveBonusMax) < 0.01, rMax.bonusMul);
+
+  const late = newSim();
+  late.startWave();
+  const lateDelay = (E.GameConfig.earlyWaveMinDelay + E.GameConfig.earlyWaveBonusWindow + 5) * E.GameConfig.tickRate;
+  for (let i = 0; i < lateDelay; i++) late.step();
+  const rZero = late.startWave();
+  check('bonus decays to 0 well past the bonus window', rZero.ok && rZero.bonusMul === 0,
+    rZero.bonusMul);
+}
+
+// waveIndex stays the OLDEST unresolved wave even if the early-sent one
+// clears first; gold from each wave's waveEnd event matches its own bonus.
+{
+  const sim = newSim();
+  sim.startWave(); // wave 0 live
+  for (let i = 0; i < E.GameConfig.earlyWaveMinDelay * E.GameConfig.tickRate; i++) sim.step();
+  const early = sim.startWave(); // wave 1 live too (early)
+  check('setup: two waves live before this check', sim.state.liveWaves.length === 2);
+  // Clear wave 1 (the early one) first, leave wave 0's creeps in place.
+  sim.state.spawns = sim.state.spawns.filter(sp => sp.wave !== 1);
+  sim.state.creeps = sim.state.creeps.filter(c => c.wave !== 1);
+  const goldBefore = sim.state.gold;
+  sim.step();
+  const wave1Ended = sim.state.events.find(e => e.type === 'waveEnd' && e.wave === 1);
+  check('the early wave (1) clears independently and pays its own bonus',
+    !!wave1Ended && sim.state.gold > goldBefore, JSON.stringify(wave1Ended));
+  check('waveIndex does not advance while the OLDER wave (0) is still live',
+    sim.state.waveIndex === 0 && sim.state.liveWaves.length === 1 && sim.state.liveWaves[0].index === 0,
+    `waveIndex=${sim.state.waveIndex}, live=${JSON.stringify(sim.state.liveWaves)}`);
+  const expectedWave1Bonus = Math.round(E.VersionsConfig.classic.waves[1].bonus * (1 + early.bonusMul));
+  check('the early wave paid the correctly boosted bonus', wave1Ended.bonus === expectedWave1Bonus,
+    `${wave1Ended.bonus} vs expected ${expectedWave1Bonus}`);
+  // Now clear wave 0 too — waveIndex should finally advance past it (wave 1
+  // already cleared earlier, so this step only resolves wave 0: 0 -> 1).
+  sim.state.spawns = [];
+  sim.state.creeps = [];
+  sim.step();
+  check('waveIndex advances once the older wave finally clears too',
+    sim.state.waveIndex === 1 && sim.state.liveWaves.length === 0,
+    `waveIndex=${sim.state.waveIndex}`);
+}
+
+// Determinism: identical early-send sequence twice -> identical outcome.
+{
+  function earlySendRun() {
+    const sim = newSim();
+    sim.state.gold = 1000;
+    sim.build('arrow', 10, 3); sim.build('arrow', 13, 3);
+    sim.startWave();
+    for (let i = 0; i < (E.GameConfig.earlyWaveMinDelay + 3) * E.GameConfig.tickRate; i++) sim.step();
+    sim.startWave(); // early send
+    for (let i = 0; i < 20 * 60 && sim.state.liveWaves.length > 0; i++) sim.step();
+    return { tick: sim.state.tick, gold: sim.state.gold, waveIndex: sim.state.waveIndex, lives: sim.state.lives };
+  }
+  const a = earlySendRun();
+  const b = earlySendRun();
+  check('early-send sequences are deterministic',
+    a.tick === b.tick && a.gold === b.gold && a.waveIndex === b.waveIndex && a.lives === b.lives,
+    JSON.stringify({ a, b }));
+}
+
+// Victory cannot fire while a tail wave is still live, even past the script end.
+{
+  const sim = newSim();
+  sim.state.waveIndex = sim.waves.length - 1; // last scripted wave
+  sim.startWave();
+  for (let i = 0; i < E.GameConfig.earlyWaveMinDelay * E.GameConfig.tickRate; i++) sim.step();
+  // Can't early-send past the last wave — there's nothing after it (non-endless).
+  const r = sim.startWave();
+  check('cannot early-send past the last scripted wave (non-endless)',
+    !r.ok && r.error === 'nowave');
+  sim.state.creeps = [];
+  sim.state.spawns = [];
+  sim.step();
+  check('victory fires normally once the sole live (last) wave clears',
+    sim.state.phase === 'victory');
+}
+
 console.log(failures === 0 ? '\nAll smoke tests passed.' : `\n${failures} test(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

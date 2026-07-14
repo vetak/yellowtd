@@ -26,12 +26,20 @@ class Simulation {
       gold: Math.round((this.difficulty.startGold != null ? this.difficulty.startGold : this.cfg.startGold) * this._goldMul),
       lives: this.difficulty.startLives != null ? this.difficulty.startLives : this.cfg.startLives,
       phase: 'build',              // 'build' | 'wave' | 'victory' | 'defeat'
-      waveIndex: 0,                // during 'build': next wave; during 'wave': current wave
+      // waveIndex is always the OLDEST unresolved wave: the one shown as
+      // "next" in build phase, or "current" once at least one wave is live.
+      // It only advances when that wave fully clears — never at send time —
+      // so it stays meaningful even with an early-sent wave running ahead of it.
+      waveIndex: 0,
+      // Waves currently in flight (spawning or with creeps alive): normally
+      // one, briefly two when the player sends the next wave early (1.1.0
+      // "Темп волн"). { index, startedAt, bonusMul }.
+      liveWaves: [],
       waveTimer: this.cfg.firstWaveDelay,
       creeps: [],
       towers: [],
       projectiles: [],
-      spawns: [],                  // pending spawns: { at, group, flags }
+      spawns: [],                  // pending spawns: { at, group, flags, wave }
       nextId: 1,
       events: [],                  // transient events emitted during the last step
       // run statistics (persisted in saves, shown on the results screen)
@@ -54,6 +62,7 @@ class Simulation {
   importState(snapshot) {
     this.state = JSON.parse(JSON.stringify(snapshot));
     this.state.events = [];
+    if (!this.state.liveWaves) this.state.liveWaves = []; // saves predating 1.1.0
   }
 
   // ---------------------------------------------------------------- commands
@@ -267,12 +276,31 @@ class Simulation {
     };
   }
 
+  // Sends the next wave. Normally that's the only wave (liveWaves empty,
+  // phase 'build'). With exactly one wave already live, this is an EARLY
+  // send — allowed only after earlyWaveMinDelay seconds into that wave, and
+  // paying a bonus that decays from earlyWaveBonusMax to 0 over
+  // earlyWaveBonusWindow seconds past the unlock. Hard-capped at
+  // maxConcurrentWaves in flight at once (1.1.0 "Темп волн").
   startWave() {
     const s = this.state;
-    if (s.phase !== 'build') return { ok: false, error: 'phase' };
-    const wave = this._waveAt(s.waveIndex);
+    if (this.isOver()) return { ok: false, error: 'over' };
+    const maxLive = this.cfg.maxConcurrentWaves || 1;
+    if (s.liveWaves.length >= maxLive) return { ok: false, error: 'toomanywaves' };
+    let bonusMul = 0;
+    if (s.liveWaves.length === 1) {
+      const elapsed = s.time - s.liveWaves[0].startedAt;
+      const minDelay = this.cfg.earlyWaveMinDelay || 0;
+      if (elapsed < minDelay) return { ok: false, error: 'notyet' };
+      const sinceUnlock = elapsed - minDelay;
+      const window = this.cfg.earlyWaveBonusWindow || 1;
+      const maxBonus = this.cfg.earlyWaveBonusMax || 0;
+      bonusMul = Math.max(0, maxBonus * (1 - sinceUnlock / window));
+    }
+    const sendIndex = s.waveIndex + s.liveWaves.length;
+    const wave = this._waveAt(sendIndex);
     if (!wave) return { ok: false, error: 'nowave' };
-    s.phase = 'wave';
+    s.liveWaves.push({ index: sendIndex, startedAt: s.time, bonusMul });
     // Special-wave flags travel with each pending spawn (data-driven).
     const flags = {
       immuneToSlow: !!wave.immuneToSlow,
@@ -281,12 +309,13 @@ class Simulation {
     };
     for (const group of wave.groups) {
       for (let i = 0; i < group.count; i++) {
-        s.spawns.push({ at: s.time + i * group.interval, group, flags });
+        s.spawns.push({ at: s.time + i * group.interval, group, flags, wave: sendIndex });
       }
     }
     s.spawns.sort((a, b) => a.at - b.at);
-    s.events.push({ type: 'waveStart', wave: s.waveIndex });
-    return { ok: true };
+    s.phase = 'wave';
+    s.events.push({ type: 'waveStart', wave: sendIndex, early: bonusMul > 0 });
+    return { ok: true, early: bonusMul > 0, bonusMul };
   }
 
   // -------------------------------------------------------------------- step
@@ -314,13 +343,14 @@ class Simulation {
   _processSpawns() {
     const s = this.state;
     while (s.spawns.length > 0 && s.spawns[0].at <= s.time) {
-      const { group, flags } = s.spawns.shift();
+      const { group, flags, wave } = s.spawns.shift();
       const base = this.creepsCfg[group.creep];
       const start = this.path.posAt(0);
       const hp = Math.round(group.hp * (this.difficulty.hpMul || 1));
       const extra = flags && flags.extra;
       s.creeps.push({
         id: s.nextId++,
+        wave,                        // which live wave this creep belongs to
         defId: group.creep,
         name: base.name,
         type: base.type,
@@ -558,22 +588,36 @@ class Simulation {
     s.events.push({ type: 'kill', x: c.x, y: c.y, bounty: c.bounty });
   }
 
+  // Resolves each live wave independently (a wave clears once none of its
+  // spawns/creeps remain), in case an early-sent wave finishes before or
+  // after the one it overlapped with.
   _checkWaveEnd() {
     const s = this.state;
-    if (s.phase !== 'wave') return;
-    if (s.spawns.length > 0 || s.creeps.length > 0) return;
-    const wave = this._waveAt(s.waveIndex);
-    const bonus = Math.round(wave.bonus * this._goldMul);
-    s.gold += bonus;
-    s.goldEarned += bonus;
-    s.events.push({ type: 'waveEnd', wave: s.waveIndex, bonus });
-    s.waveIndex++;
-    if (!this.endless && s.waveIndex >= this.waves.length) {
-      s.phase = 'victory';
-      s.events.push({ type: 'victory' });
-    } else {
-      s.phase = 'build';
-      s.waveTimer = this.cfg.betweenWavesDelay;
+    if (s.liveWaves.length === 0) return;
+    for (let i = s.liveWaves.length - 1; i >= 0; i--) {
+      const lw = s.liveWaves[i];
+      const stillSpawning = s.spawns.some(sp => sp.wave === lw.index);
+      const stillAlive = s.creeps.some(c => c.wave === lw.index);
+      if (stillSpawning || stillAlive) continue;
+      const wave = this._waveAt(lw.index);
+      const bonus = Math.round(wave.bonus * this._goldMul * (1 + lw.bonusMul));
+      s.gold += bonus;
+      s.goldEarned += bonus;
+      s.events.push({ type: 'waveEnd', wave: lw.index, bonus, early: lw.bonusMul > 0 });
+      s.liveWaves.splice(i, 1);
+      // waveIndex tracks the oldest unresolved wave — only advance past it
+      // once it's the one that actually cleared (an early wave may clear
+      // first, in which case the pointer stays put until the older one does).
+      if (lw.index === s.waveIndex) s.waveIndex++;
+    }
+    if (s.liveWaves.length === 0) {
+      if (!this.endless && s.waveIndex >= this.waves.length) {
+        s.phase = 'victory';
+        s.events.push({ type: 'victory' });
+      } else {
+        s.phase = 'build';
+        s.waveTimer = this.cfg.betweenWavesDelay;
+      }
     }
   }
 }

@@ -1,5 +1,5 @@
 // Global game rules. Everything tunable lives in data/ — the engine hardcodes nothing.
-const GAME_VERSION = '1.0.1';
+const GAME_VERSION = '1.1.0';
 
 const GameConfig = {
   tickRate: 20,           // fixed simulation steps per second (deterministic)
@@ -10,6 +10,12 @@ const GameConfig = {
   betweenWavesDelay: 15,  // seconds between waves (can be skipped with Send Wave)
   autoStartWaves: true,   // false = waves start only via Send Wave (user setting)
   speeds: [1, 2, 3],      // available game speed multipliers
+  // 1.1.0 "Темп волн": send the next wave early, on top of the current one,
+  // for a decaying gold bonus. Capped at maxConcurrentWaves in flight.
+  maxConcurrentWaves: 2,     // current wave + at most one early-sent wave
+  earlyWaveMinDelay: 10,     // seconds into the current wave before early-send unlocks
+  earlyWaveBonusMax: 0.10,   // +10% of the sent wave's bonus if sent the instant it unlocks
+  earlyWaveBonusWindow: 20,  // seconds over which that bonus decays from max to 0
 };
 
 // Difficulty presets, applied on top of GameConfig and wave data.

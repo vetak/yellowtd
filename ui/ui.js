@@ -11,6 +11,8 @@ const ERROR_TEXT = {
   over: 'Игра окончена',
   noSell: 'Испытание «Без продажи»: продажа отключена',
   onePerType: 'Испытание «Одна башня на тип»: этот тип уже построен',
+  notyet: 'Ещё рано отправлять следующую волну',
+  toomanywaves: 'В поле уже две волны — дождитесь, пока одна закончится',
 };
 
 const TARGET_LABEL = { ground: 'земля', air: 'воздух' };
@@ -405,33 +407,77 @@ class UI {
       `</div>`;
   }
 
+  // Both phases render the same structure (label + full brief + next brief)
+  // so the panel keeps a stable height and the button below never jumps.
+  // With "Темп волн" (1.1.0) up to two waves can be live at once — the panel
+  // shows the oldest as "current", the second (if any) as a compact extra
+  // line, and previews whichever wave would be sent if the button is pressed.
   _updateWavePanel(sim) {
     const s = sim.state;
-    let html = '';
-    let timer = '';
-    // Both phases render the same structure (label + full brief + next brief)
-    // so the panel keeps a stable height and the button below never jumps.
-    if (s.phase === 'build') {
-      html = `<div class="phase-label">Следующая волна:</div>` + this._waveBrief(s.waveIndex) +
-        this._waveNextBrief(s.waveIndex + 1);
-      timer = sim.cfg.autoStartWaves !== false
-        ? `Автостарт через ${Math.ceil(s.waveTimer)} с`
-        : 'Нажмите «Отправить волну»';
-    } else if (s.phase === 'wave') {
-      html = `<div class="phase-label">Идёт волна:</div>` + this._waveBrief(s.waveIndex) +
-        this._waveNextBrief(s.waveIndex + 1);
+    const live = s.liveWaves || [];
+    const primaryIdx = live.length > 0 ? live[0].index : s.waveIndex;
+    // In build phase "next" previews the wave after the one being configured;
+    // once a wave is live it's the wave a button press would actually send.
+    const nextIdx = live.length === 0 ? s.waveIndex + 1 : s.waveIndex + live.length;
+
+    const label = live.length > 0 ? 'Идёт волна:' : 'Следующая волна:';
+    let html = `<div class="phase-label">${label}</div>` + this._waveBrief(primaryIdx);
+    if (live.length > 1) {
+      const w2 = this._waveAt(live[1].index);
+      if (w2) {
+        html += `<div class="next-brief"><div class="wname">Также в поле — ${live[1].index + 1}. ` +
+          `${w2.name} ${this._waveBadges(w2).join(' ')}</div></div>`;
+      }
     }
+    html += this._waveNextBrief(nextIdx);
     this._set('wave-name', html);
+
+    const timer = live.length === 0
+      ? (sim.cfg.autoStartWaves !== false
+        ? `Автостарт через ${Math.ceil(s.waveTimer)} с`
+        : 'Нажмите «Отправить волну»')
+      : '';
     this._set('wave-timer', timer);
-    this.el['send-wave-btn'].disabled = s.phase !== 'build';
-    this._updateWaveTimeline(sim);
+    this._updateSendWaveButton(sim, live);
+    this._updateWaveTimeline(nextIdx);
+  }
+
+  // "Отправить волну" reflects exactly what pressing it would do right now:
+  // start the first wave, wait out the early-send cooldown, show the live
+  // decaying bonus once it's available, or refuse when two are already live.
+  _updateSendWaveButton(sim, live) {
+    const btn = this.el['send-wave-btn'];
+    if (live.length === 0) {
+      btn.disabled = false;
+      btn.textContent = 'Отправить волну';
+      return;
+    }
+    const maxLive = sim.cfg.maxConcurrentWaves || 1;
+    if (live.length >= maxLive) {
+      btn.disabled = true;
+      btn.textContent = 'Отправить волну';
+      return;
+    }
+    const elapsed = sim.state.time - live[0].startedAt;
+    const minDelay = sim.cfg.earlyWaveMinDelay || 0;
+    if (elapsed < minDelay) {
+      btn.disabled = true;
+      btn.textContent = `Досрочно через ${Math.ceil(minDelay - elapsed)} с`;
+      return;
+    }
+    const sinceUnlock = elapsed - minDelay;
+    const window = sim.cfg.earlyWaveBonusWindow || 1;
+    const maxBonus = sim.cfg.earlyWaveBonusMax || 0;
+    const mul = Math.max(0, maxBonus * (1 - sinceUnlock / window));
+    btn.disabled = false;
+    btn.textContent = mul > 0.001
+      ? `Отправить досрочно (+${Math.round(mul * 100)}%)`
+      : 'Отправить досрочно';
   }
 
   // Upcoming-waves timeline: a compact strip of the next few waves so special
   // ones (air/boss/immune) are visible several waves ahead, not as a surprise.
-  _updateWaveTimeline(sim) {
-    const s = sim.state;
-    const from = s.phase === 'wave' ? s.waveIndex + 1 : s.waveIndex;
+  _updateWaveTimeline(from) {
     const chips = [];
     for (let i = from; i < from + TIMELINE_LENGTH; i++) {
       const wave = this._waveAt(i);
