@@ -25,6 +25,16 @@
   let lastRunNewRecord = false; // did the most recent run land at #1 on its leaderboard?
   let appState = 'menu';
   let menuMode = 'main';
+  // 0.11.0: endless mode and challenge modifiers, chosen on the difficulty screen.
+  let endlessMode = false;
+  let activeModifiers = {};
+
+  // Endless runs get their own leaderboard bucket (wave count is unbounded,
+  // not comparable to a capped campaign run); challenge modifiers don't split
+  // the board further — a challenge run still competes in its difficulty.
+  function recordKey() {
+    return difficultyId + (endlessMode ? '-endless' : '');
+  }
 
   // Resize the canvas and swap renderer/UI configs to the given map version.
   function applyVersion(verId) {
@@ -50,6 +60,8 @@
       creeps: v.creeps,
       waves: v.waves,
       difficulty: DifficultyConfig[diffId],
+      endless: endlessMode,
+      modifiers: activeModifiers,
     });
   }
 
@@ -59,6 +71,8 @@
       version: GAME_VERSION,
       versionId,
       difficulty: difficultyId,
+      endless: endlessMode,
+      modifiers: activeModifiers,
       savedAt: Date.now(),
       state: sim.exportState(),
     });
@@ -86,7 +100,8 @@
     if (!save) return null;
     return {
       versionName: VersionsConfig[save.versionId].name,
-      difficultyName: (DifficultyConfig[save.difficulty] || DifficultyConfig.normal).name,
+      difficultyName: (DifficultyConfig[save.difficulty] || DifficultyConfig.normal).name +
+        (save.endless ? ' · Эндлесс' : ''),
     };
   }
 
@@ -102,7 +117,8 @@
     const el = document.getElementById('footer-line');
     const ver = ' · ' + VersionsConfig[versionId].name;
     const diff = sim ? ' · ' + DifficultyConfig[difficultyId].name : '';
-    el.textContent = 'YellowTD v' + GAME_VERSION + ver + diff;
+    const mode = sim && endlessMode ? ' · Эндлесс' : '';
+    el.textContent = 'YellowTD v' + GAME_VERSION + ver + diff + mode;
   }
 
   function enterGame() {
@@ -117,9 +133,11 @@
     updateFooter();
   }
 
-  function startNewGame(diffId, verId) {
+  function startNewGame(diffId, verId, modeOptions) {
     difficultyId = diffId in DifficultyConfig && isDifficultyUnlocked(diffId) ? diffId : 'normal';
     applyVersion(verId !== undefined ? verId : versionId);
+    endlessMode = !!(modeOptions && modeOptions.endless);
+    activeModifiers = (modeOptions && modeOptions.modifiers) || {};
     sim = createSim(difficultyId, versionId);
     enterGame();
     saveNow();
@@ -128,6 +146,8 @@
   function continueGame() {
     const save = latestSave();
     if (!save) return;
+    endlessMode = !!save.endless;
+    activeModifiers = save.modifiers || {};
     difficultyId = save.difficulty in DifficultyConfig ? save.difficulty : 'normal';
     applyVersion(save.versionId);
     sim = createSim(difficultyId, versionId);
@@ -162,7 +182,8 @@
   }
 
   function restartGame() {
-    startNewGame(difficultyId, versionId);
+    // Preserve the current run's mode (endless/challenges) across a restart.
+    startNewGame(difficultyId, versionId, { endless: endlessMode, modifiers: activeModifiers });
   }
 
   function applySettings() {
@@ -310,7 +331,7 @@
               won: ev.type === 'victory',
               at: Date.now(),
             };
-            const ranked = Storage.addRecord(versionId, difficultyId, entry);
+            const ranked = Storage.addRecord(versionId, recordKey(), entry);
             lastRunNewRecord = ranked[0] === entry; // reference check: did it land on top?
           }
         }

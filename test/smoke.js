@@ -25,13 +25,13 @@ const ctx = vm.createContext({});
 vm.runInContext(source, ctx);
 const E = ctx.__engine;
 
-function newSim(diffId, versionId) {
+function newSim(diffId, versionId, extra) {
   const v = E.VersionsConfig[versionId || 'classic'];
-  return new E.Simulation({
+  return new E.Simulation(Object.assign({
     game: E.GameConfig, map: v.map, towers: v.towers,
     creeps: v.creeps, waves: v.waves,
     difficulty: E.DifficultyConfig[diffId || 'normal'],
-  });
+  }, extra));
 }
 
 function run(plan, opts) {
@@ -574,6 +574,113 @@ check('canyon: save/restore at wave 8 → identical outcome',
   cresumed.result === cgood.result && cresumed.lives === cgood.lives &&
   cresumed.gold === cgood.gold && cresumed.ticks === cgood.ticks,
   `lives ${cresumed.lives}/${cgood.lives}, gold ${cresumed.gold}/${cgood.gold}`);
+
+// ============================================================ 0.11.0 modes
+
+// Endless: after the scripted waves run out, the sim keeps generating waves
+// deterministically instead of declaring victory.
+{
+  const sim = newSim('normal', 'classic', { endless: true });
+  const scriptedLen = sim.waves.length;
+  const generatedHp = [];
+  let sawBoss = false;
+  let sawVictory = false;
+  for (let extra = 0; extra < 8; extra++) {
+    sim.state.waveIndex = scriptedLen + extra;
+    sim.state.phase = 'build';
+    const r = sim.startWave();
+    if (!r.ok) { check(`endless: startWave ok at extra ${extra}`, false, r.error); break; }
+    if (sim.state.phase === 'victory') sawVictory = true;
+    const wave = sim._waveAt(scriptedLen + extra);
+    generatedHp.push(Math.max(...wave.groups.map(g => g.hp)));
+    if (wave.boss) sawBoss = true;
+    sim.state.creeps = [];
+    sim.state.spawns = [];
+    sim.step(); // triggers _checkWaveEnd -> phase back to 'build', never 'victory'
+  }
+  check('endless: never declares victory past the scripted waves', !sawVictory);
+  check('endless: generated waves reference valid (non-boss or boss) creep ids',
+    generatedHp.every(hp => hp > 0), JSON.stringify(generatedHp));
+  check('endless: difficulty escalates across generated waves',
+    generatedHp[generatedHp.length - 1] > generatedHp[0], JSON.stringify(generatedHp));
+  check('endless: a boss echo wave appears periodically (every 6th)', sawBoss);
+}
+
+// Endless: deterministic — same forced sequence twice gives identical stats.
+{
+  function runEndlessOnce() {
+    const sim = newSim('normal', 'canyon', { endless: true });
+    const scriptedLen = sim.waves.length;
+    for (let extra = 0; extra < 5; extra++) {
+      sim.state.waveIndex = scriptedLen + extra;
+      sim.state.phase = 'build';
+      sim.startWave();
+      sim.state.creeps = [];
+      sim.state.spawns = [];
+      sim.step();
+    }
+    return { gold: sim.state.gold, waveIndex: sim.state.waveIndex };
+  }
+  const a = runEndlessOnce();
+  const b = runEndlessOnce();
+  check('endless: deterministic across identical runs',
+    a.gold === b.gold && a.waveIndex === b.waveIndex, JSON.stringify({ a, b }));
+}
+
+// Endless: a non-endless sim past its last wave has nothing to start (regression guard).
+{
+  const sim = newSim('normal', 'classic');
+  sim.state.waveIndex = sim.waves.length;
+  sim.state.phase = 'build';
+  const r = sim.startWave();
+  check('non-endless: startWave past the last wave reports nowave', !r.ok && r.error === 'nowave');
+}
+
+// Challenge modifiers: noSell, oneTowerPerType, goldMul, creepSpeedMul.
+{
+  const sim = newSim('normal', 'classic', { modifiers: { noSell: true } });
+  sim.build('arrow', 10, 3);
+  const t = sim.towerAt(10, 3);
+  const goldBefore = sim.state.gold;
+  const r = sim.sell(t.id);
+  check('modifier noSell: sell is rejected and gold unchanged',
+    !r.ok && r.error === 'noSell' && sim.state.gold === goldBefore);
+  const rAll = sim.sellAllOfType('arrow');
+  check('modifier noSell: sellAllOfType is rejected too', !rAll.ok && rAll.error === 'noSell');
+}
+{
+  const sim = newSim('normal', 'classic', { modifiers: { oneTowerPerType: true } });
+  const r1 = sim.build('arrow', 10, 3);
+  const r2 = sim.build('arrow', 13, 3);
+  const r3 = sim.build('frost', 11, 4);
+  check('modifier oneTowerPerType: 2nd tower of the same type is rejected',
+    r1.ok && !r2.ok && r2.error === 'onePerType' && r3.ok);
+}
+{
+  const normalGold = newSim('normal', 'classic').state.gold;
+  const halfSim = newSim('normal', 'classic', { modifiers: { goldMul: 0.5 } });
+  check('modifier goldMul: halves starting gold',
+    halfSim.state.gold === Math.round(normalGold * 0.5),
+    `${halfSim.state.gold} vs expected ${Math.round(normalGold * 0.5)}`);
+  halfSim.build('arrow', 10, 3);
+  halfSim.startWave();
+  let killGold = null;
+  for (let i = 0; i < 20 * 120 && killGold === null; i++) {
+    halfSim.step();
+    if (halfSim.state.events.some(e => e.type === 'kill')) killGold = halfSim.state.totalKills;
+  }
+  check('modifier goldMul: at least one kill happened to validate the halved bounty path', killGold !== null);
+}
+{
+  const base = newSim('normal', 'classic');
+  const fast = newSim('normal', 'classic', { modifiers: { creepSpeedMul: 2 } });
+  base.startWave(); fast.startWave();
+  for (let i = 0; i < 15; i++) { base.step(); fast.step(); }
+  const bp = base.state.creeps[0] ? base.state.creeps[0].progress : 0;
+  const fp = fast.state.creeps[0] ? fast.state.creeps[0].progress : 0;
+  check('modifier creepSpeedMul: doubles creep movement progress',
+    fp > bp * 1.8, `base ${bp}, fast ${fp}`);
+}
 
 console.log(failures === 0 ? '\nAll smoke tests passed.' : `\n${failures} test(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

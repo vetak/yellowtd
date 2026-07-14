@@ -171,6 +171,7 @@ button.active { background: #6b5d1f; border-color: #e6c832; }
 .menu-screen.hidden { display: none; }
 .menu-screen > button { font-size: 16px; padding: 11px; }
 .screen-title { font-size: 13px; color: #a89e75; text-transform: uppercase; text-align: center; margin-bottom: 4px; }
+.challenge-title { font-size: 11px; color: #a89e75; text-transform: uppercase; margin: 6px 0 2px; }
 .menu-back { margin-top: 8px; }
 
 .diff-btn {

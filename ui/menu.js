@@ -40,6 +40,12 @@
     this.btnPauseSettings = document.getElementById('menu-pause-settings');
     this.btnToMain = document.getElementById('menu-to-main');
 
+    this.chkEndless = document.getElementById('mode-endless');
+    this.chkNoSell = document.getElementById('mode-nosell');
+    this.chkOneType = document.getElementById('mode-onetype');
+    this.chkHalfGold = document.getElementById('mode-halfgold');
+    this.chkFastCreeps = document.getElementById('mode-fastcreeps');
+
     this.btnBackVersion = document.getElementById('back-from-version');
     this.btnBackDiff = document.getElementById('back-from-difficulty');
     this.btnBackSettings = document.getElementById('back-from-settings');
@@ -138,6 +144,17 @@
 
   // Rebuilt every time the screen is shown — unlocks can change mid-session
   // (e.g. just won on Hard, Nightmare should light up without a reload).
+  // Reads the endless toggle and challenge checkboxes from the difficulty
+  // screen into the {endless, modifiers} shape the engine expects.
+  Menu.prototype.readModeOptions = function () {
+    const modifiers = {};
+    if (this.chkNoSell && this.chkNoSell.checked) modifiers.noSell = true;
+    if (this.chkOneType && this.chkOneType.checked) modifiers.oneTowerPerType = true;
+    if (this.chkHalfGold && this.chkHalfGold.checked) modifiers.goldMul = 0.5;
+    if (this.chkFastCreeps && this.chkFastCreeps.checked) modifiers.creepSpeedMul = 1.5;
+    return { endless: !!(this.chkEndless && this.chkEndless.checked), modifiers };
+  };
+
   Menu.prototype.buildDifficultyButtons = function () {
     const ids = Object.keys(this.opts.difficulties || {});
     this.diffButtons.innerHTML = '';
@@ -151,7 +168,7 @@
         btn.innerHTML = '<strong>' + diff.name + '</strong><span>' + diff.desc + '</span>';
         btn.addEventListener('click', () => {
           this.close();
-          this.opts.onNewGame(id, this.pendingVersionId);
+          this.opts.onNewGame(id, this.pendingVersionId, this.readModeOptions());
         });
       } else {
         btn.disabled = true;
@@ -172,14 +189,19 @@
     for (const vId of versionIds) {
       const vName = (this.opts.versions[vId] || {}).name || vId;
       for (const dId of diffIds) {
-        const list = this.opts.getRecords(vId, dId) || [];
-        if (list.length === 0) continue;
-        const dName = (this.opts.difficulties[dId] || {}).name || dId;
-        const rows = list.map((r, i) =>
-          `<tr><td>${i + 1}</td><td>${r.wave}</td><td>${r.lives}</td><td>${r.gold}</td>` +
-          `<td>${r.won ? 'Победа' : 'Пал'}</td></tr>`).join('');
-        html += `<div class="records-group"><div class="records-title">${vName} · ${dName}</div>` +
-          `<table class="records-table"><tr><th>#</th><th>Волна</th><th>Жизни</th><th>Золото</th><th>Итог</th></tr>${rows}</table></div>`;
+        // Endless runs live in their own bucket — unbounded wave count isn't
+        // comparable to a capped campaign run on the same difficulty.
+        for (const modeKey of [dId, dId + '-endless']) {
+          const list = this.opts.getRecords(vId, modeKey) || [];
+          if (list.length === 0) continue;
+          const dName = (this.opts.difficulties[dId] || {}).name || dId;
+          const label = modeKey.endsWith('-endless') ? dName + ' · Эндлесс' : dName;
+          const rows = list.map((r, i) =>
+            `<tr><td>${i + 1}</td><td>${r.wave}</td><td>${r.lives}</td><td>${r.gold}</td>` +
+            `<td>${r.won ? 'Победа' : 'Пал'}</td></tr>`).join('');
+          html += `<div class="records-group"><div class="records-title">${vName} · ${label}</div>` +
+            `<table class="records-table"><tr><th>#</th><th>Волна</th><th>Жизни</th><th>Золото</th><th>Итог</th></tr>${rows}</table></div>`;
+        }
       }
     }
     this.recordsBody.innerHTML = html || '<div class="muted">Пока нет завершённых забегов.</div>';

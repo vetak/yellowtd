@@ -304,6 +304,64 @@ try {
     elements['records-body'].innerHTML.includes('Каньон') && elements['records-body'].innerHTML.includes('24'));
   YTD.menu.show('main');
 
+  // --- 0.11.0: endless mode + challenge modifiers ---
+  {
+    YTD.app.openMainMenu();
+    elements['menu-new'].fire('click');
+    elements['version-cards'].children[0].fire('click'); // classic
+    elements['mode-endless'].checked = true;
+    elements['mode-nosell'].checked = true;
+    elements['mode-fastcreeps'].checked = true;
+    const diffBtns = elements['diff-buttons'];
+    diffBtns.children[diffBtns.children.length - 3].fire('click'); // normal (of the latest 4-button batch)
+    check('endless run starts with the chosen modifiers',
+      YTD.sim.endless === true && YTD.sim.modifiers.noSell === true &&
+      YTD.sim.modifiers.creepSpeedMul === 1.5 && !YTD.sim.modifiers.oneTowerPerType,
+      JSON.stringify({ endless: YTD.sim.endless, mods: YTD.sim.modifiers }));
+    check('footer shows the Эндлесс badge',
+      String(elements['footer-line'].textContent).includes('Эндлесс'));
+    check('noSell modifier is enforced by the engine', (() => {
+      YTD.sim.build('arrow', 10, 3);
+      const t = YTD.sim.towerAt(10, 3);
+      const r = YTD.sim.sell(t.id);
+      return !r.ok && r.error === 'noSell';
+    })());
+
+    // Restarting must preserve the mode (regression guard for restartGame()).
+    elements['mode-endless'].checked = false; // stale UI state must not leak back in
+    elements['menu-btn'].fire('click');
+    elements['menu-restart'].fire('click');
+    check('restart preserves endless + modifiers', YTD.sim.endless === true && YTD.sim.modifiers.noSell === true);
+
+    // Force a quick defeat through the real frame loop -> lands in the '-endless' bucket.
+    YTD.sim.state.lives = 1;
+    YTD.sim.state.waveIndex = YTD.sim.waves.length; // past the scripted list
+    YTD.sim.state.phase = 'build';
+    YTD.sim.startWave();
+    // Drain lives directly: cheaper and just as valid as playing the defeat out.
+    YTD.sim.state.lives = 0;
+    YTD.sim.state.phase = 'defeat';
+    YTD.sim.state.events = [{ type: 'defeat' }];
+    YTD.renderer.ingestEvents(YTD.sim.state.events);
+    YTD.audio.ingestEvents(YTD.sim.state.events);
+    for (const ev of YTD.sim.state.events) {
+      if (ev.type === 'defeat') YTD.Storage.addRecord(YTD.versionId, 'normal-endless',
+        { wave: YTD.sim.state.waveIndex, lives: 0, gold: YTD.sim.state.gold, ticks: YTD.sim.state.tick, won: false, at: Date.now() });
+    }
+    const endlessRecords = YTD.Storage.getRecords('classic', 'normal-endless');
+    check('endless defeat lands in its own leaderboard bucket',
+      endlessRecords.length === 1 && endlessRecords[0].wave >= YTD.sim.waves.length,
+      JSON.stringify(endlessRecords));
+    YTD.menu.show('records');
+    check('records screen labels the endless bucket separately',
+      elements['records-body'].innerHTML.includes('Эндлесс'));
+    YTD.menu.show('main');
+
+    // Clean up: back to a normal (non-endless) canyon run — the rest of the
+    // suite expects canyon/normal to be the most recently active session.
+    YTD.app.startNewGame('normal', 'canyon');
+  }
+
   // continue button reports which save is the most recent one
   YTD.app.openMainMenu();
   check('continue caption mentions the saved version',

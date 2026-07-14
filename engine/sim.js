@@ -13,10 +13,17 @@ class Simulation {
     this.path = buildPath(configs.map);
     this.dt = 1 / this.cfg.tickRate;
 
+    // 0.11.0: endless mode (procedural waves past the scripted list) and
+    // challenge modifiers (data flags, no engine forks). Both optional.
+    this.endless = !!configs.endless;
+    this.modifiers = configs.modifiers || {};
+    this._goldMul = this.modifiers.goldMul != null ? this.modifiers.goldMul : 1;
+    this._speedMul = this.modifiers.creepSpeedMul != null ? this.modifiers.creepSpeedMul : 1;
+
     this.state = {
       tick: 0,
       time: 0,
-      gold: this.difficulty.startGold != null ? this.difficulty.startGold : this.cfg.startGold,
+      gold: Math.round((this.difficulty.startGold != null ? this.difficulty.startGold : this.cfg.startGold) * this._goldMul),
       lives: this.difficulty.startLives != null ? this.difficulty.startLives : this.cfg.startLives,
       phase: 'build',              // 'build' | 'wave' | 'victory' | 'defeat'
       waveIndex: 0,                // during 'build': next wave; during 'wave': current wave
@@ -79,6 +86,9 @@ class Simulation {
     if (this.isOver()) return { ok: false, error: 'over' };
     const def = this.towersCfg[typeId];
     if (!def) return { ok: false, error: 'unknown' };
+    if (this.modifiers.oneTowerPerType && this.towersOfType(typeId).length >= 1) {
+      return { ok: false, error: 'onePerType' };
+    }
     const place = this.canPlace(col, row);
     if (!place.ok) return place;
     const cost = def.levels[0].cost;
@@ -152,6 +162,7 @@ class Simulation {
   sell(towerId) {
     const s = this.state;
     if (this.isOver()) return { ok: false, error: 'over' };
+    if (this.modifiers.noSell) return { ok: false, error: 'noSell' };
     const idx = s.towers.findIndex(t => t.id === towerId);
     if (idx < 0) return { ok: false, error: 'unknown' };
     const refund = Math.floor(s.towers[idx].invested * this.cfg.sellRatio);
@@ -164,6 +175,7 @@ class Simulation {
   sellAllOfType(typeId) {
     const s = this.state;
     if (this.isOver()) return { ok: false, error: 'over' };
+    if (this.modifiers.noSell) return { ok: false, error: 'noSell' };
     const list = s.towers.filter(t => t.typeId === typeId);
     if (list.length === 0) return { ok: false, error: 'unknown' };
     let refund = 0;
@@ -186,10 +198,62 @@ class Simulation {
     return refund;
   }
 
+  // Wave descriptor at a given index: scripted waves come from data/, past
+  // the end of that list an endless run generates one procedurally.
+  _waveAt(index) {
+    if (index < this.waves.length) return this.waves[index];
+    return this.endless ? this._genEndlessWave(index) : null;
+  }
+
+  // Deterministic procedural wave for endless mode: pure function of the
+  // wave index and the version's own data (no Math.random, no engine fork).
+  // Seeds difficulty from the last scripted "regular" wave so it continues
+  // the curve instead of resetting to wave-1 strength.
+  _genEndlessWave(index) {
+    if (!this._endlessSeed) {
+      const seedWave = this.waves[this.waves.length - 2] || this.waves[this.waves.length - 1];
+      this._endlessSeed = {
+        hp: Math.max(...seedWave.groups.map(g => g.hp)),
+        bounty: Math.max(...seedWave.groups.map(g => g.bounty)),
+      };
+    }
+    const extra = index - this.waves.length; // 0, 1, 2, ... waves past the script
+    const growth = Math.pow(1.07, extra + 1);
+    const bossIds = Object.keys(this.creepsCfg).filter(id => this.creepsCfg[id].boss).sort();
+    if (bossIds.length > 0 && extra % 6 === 5) {
+      const bossId = bossIds[Math.floor(extra / 6) % bossIds.length];
+      return {
+        name: `Эндлесс: волна ${index + 1}`, boss: true,
+        bonus: Math.round(this._endlessSeed.bounty * growth * 6),
+        groups: [{
+          creep: bossId, count: 1, interval: 1.0,
+          hp: Math.round(this._endlessSeed.hp * growth * 3),
+          bounty: Math.round(this._endlessSeed.bounty * growth * 8),
+          armor: Math.min(24, 8 + Math.floor(extra / 6)),
+        }],
+      };
+    }
+    const ids = Object.keys(this.creepsCfg).filter(id => !this.creepsCfg[id].boss).sort();
+    const creepId = ids[extra % ids.length];
+    return {
+      name: `Эндлесс: волна ${index + 1}`,
+      bonus: Math.round(this._endlessSeed.bounty * growth * 1.5),
+      immuneToSlow: extra % 4 === 3,
+      regen: extra % 7 === 6 ? Math.round(6 * growth) : 0,
+      groups: [{
+        creep: creepId, count: 10 + Math.floor(extra / 2),
+        interval: Math.max(0.35, 0.8 - extra * 0.005),
+        hp: Math.round(this._endlessSeed.hp * growth * (0.5 + 0.1 * (extra % ids.length))),
+        bounty: Math.max(2, Math.round(this._endlessSeed.bounty * growth * 0.3)),
+        armor: creepId === 'bulwark' ? Math.min(20, 2 + Math.floor(extra / 3)) : 0,
+      }],
+    };
+  }
+
   startWave() {
     const s = this.state;
     if (s.phase !== 'build') return { ok: false, error: 'phase' };
-    const wave = this.waves[s.waveIndex];
+    const wave = this._waveAt(s.waveIndex);
     if (!wave) return { ok: false, error: 'nowave' };
     s.phase = 'wave';
     // Special-wave flags travel with each pending spawn (data-driven).
@@ -250,7 +314,7 @@ class Simulation {
         hp,
         maxHp: hp,
         baseSpeed: base.speed * (group.speedMul || 1),
-        bounty: extra ? Math.round(group.bounty * 2) : group.bounty, // bonus wave pays double
+        bounty: Math.round((extra ? group.bounty * 2 : group.bounty) * this._goldMul), // bonus wave pays double
         armor: group.armor || 0,
         livesCost: base.livesCost,
         radius: base.radius,
@@ -286,7 +350,7 @@ class Simulation {
       }
 
       const slowed = s.time < c.slowUntil;
-      const speed = c.baseSpeed * (slowed ? c.slowFactor : 1);
+      const speed = c.baseSpeed * (slowed ? c.slowFactor : 1) * this._speedMul;
       c.progress += speed * this.dt;
       if (c.progress >= this.path.totalLength) {
         s.creeps.splice(i, 1);
@@ -481,12 +545,13 @@ class Simulation {
     const s = this.state;
     if (s.phase !== 'wave') return;
     if (s.spawns.length > 0 || s.creeps.length > 0) return;
-    const wave = this.waves[s.waveIndex];
-    s.gold += wave.bonus;
-    s.goldEarned += wave.bonus;
-    s.events.push({ type: 'waveEnd', wave: s.waveIndex, bonus: wave.bonus });
+    const wave = this._waveAt(s.waveIndex);
+    const bonus = Math.round(wave.bonus * this._goldMul);
+    s.gold += bonus;
+    s.goldEarned += bonus;
+    s.events.push({ type: 'waveEnd', wave: s.waveIndex, bonus });
     s.waveIndex++;
-    if (s.waveIndex >= this.waves.length) {
+    if (!this.endless && s.waveIndex >= this.waves.length) {
       s.phase = 'victory';
       s.events.push({ type: 'victory' });
     } else {

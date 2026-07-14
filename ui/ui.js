@@ -9,6 +9,8 @@ const ERROR_TEXT = {
   maxlevel: 'Уже максимальный уровень',
   phase: 'Волна уже идёт',
   over: 'Игра окончена',
+  noSell: 'Испытание «Без продажи»: продажа отключена',
+  onePerType: 'Испытание «Одна башня на тип»: этот тип уже построен',
 };
 
 const TARGET_LABEL = { ground: 'земля', air: 'воздух' };
@@ -309,7 +311,7 @@ class UI {
     this._set('lives-value', String(s.lives));
     const total = this.wavesCfg.length;
     const current = s.phase === 'wave' ? s.waveIndex + 1 : s.waveIndex;
-    this._set('wave-value', `${Math.min(current, total)}/${total}`);
+    this._set('wave-value', sim.endless ? String(current) : `${Math.min(current, total)}/${total}`);
 
     this._updateWavePanel(sim);
     this._updateBuildButtons(s);
@@ -328,10 +330,11 @@ class UI {
   }
 
   // Wave summary that honours every spawn group (mixed waves included).
+  // Past the scripted list, an endless run's waves are generated on the fly.
   _waveBrief(idx) {
-    const wave = this.wavesCfg[idx];
-    if (!wave) return '';
     const sim = this.getSim();
+    const wave = this.wavesCfg[idx] || (sim && sim.endless ? sim._waveAt(idx) : null);
+    if (!wave) return '';
     const hpMul = sim && sim.difficulty ? (sim.difficulty.hpMul || 1) : 1;
     const badges = [];
     if (wave.groups.some(g => (this.creepsCfg[g.creep] || {}).type === 'air')) {
@@ -477,7 +480,7 @@ class UI {
         .map(t => `${this.towersCfg[t.typeId].name} — ${t.kills}`)
         .join('<br>');
       this._set('overlay-stats',
-        `Волн пройдено: ${st.waveIndex} из ${this.wavesCfg.length}<br>` +
+        `Волн пройдено: ${st.waveIndex}${sim.endless ? '' : ' из ' + this.wavesCfg.length}<br>` +
         `Убито врагов: ${st.totalKills} · Пропущено: ${st.totalLeaks}<br>` +
         `Золото: заработано ${st.goldEarned}, потрачено ${st.goldSpent}` +
         (top ? `<br><br>Лучшие башни:<br>${top}` : ''));
