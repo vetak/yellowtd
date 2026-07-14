@@ -175,6 +175,46 @@ try {
   check('frame loop runs and HUD updates', elements['gold-value'].innerHTML === '60',
     `gold-value="${elements['gold-value'].innerHTML}"`);
 
+  // --- 1.0.1: wave panel information ---
+  {
+    // Wave 5 of Classic ("Пыльный рой") is the first air wave — a good anchor
+    // for checking that the upcoming wave shows its status badges, not just a name.
+    YTD.sim.state.waveIndex = 3; // build phase before wave 4 => next up is wave 5
+    YTD.sim.state.phase = 'build';
+    runFrames(2);
+    const html = elements['wave-name'].innerHTML;
+    check('wave panel names the upcoming wave with its number', html.includes('Далее — 5.'), html.slice(0, 160));
+    check('upcoming wave shows status badges (air), not just its name',
+      html.includes('badge air') && html.includes('ВОЗДУХ'), html.slice(0, 240));
+    check('upcoming wave shows its roster (count/HP)', html.includes('12×') && html.includes('HP '),
+      html.slice(0, 240));
+
+    // The timeline strip warns about special waves several waves ahead.
+    const tl = elements['wave-timeline'].innerHTML;
+    check('timeline lists upcoming waves', tl.includes('tl-strip') && tl.includes('Впереди'), tl.slice(0, 120));
+    check('timeline flags the upcoming air wave', tl.includes('tl-air'), tl.slice(0, 240));
+    // From wave 4 the strip covers 4..11, which includes the bonus wave (7),
+    // the regen wave (8) and the immune wave (10) — several waves of warning.
+    check('timeline warns about other special waves ahead',
+      tl.includes('tl-extra') && tl.includes('tl-regen') && tl.includes('tl-immune'),
+      tl.slice(0, 500));
+
+    // Panel keeps the same structure in both phases, so nothing below it jumps.
+    // Drive the UI directly: stepping the sim with an empty field would end the
+    // wave immediately and flip the phase back before we could look at it.
+    YTD.sim.state.phase = 'wave';
+    YTD.ui.update(YTD.sim);
+    const waveHtml = elements['wave-name'].innerHTML;
+    check('wave phase keeps both the current and the upcoming wave sections',
+      waveHtml.includes('Идёт волна') && waveHtml.includes('Далее — '), waveHtml.slice(0, 120));
+
+    // Restore the exact pre-block state (the checks below expect wave 1 / 60 gold).
+    YTD.sim.state.waveIndex = 0;
+    YTD.sim.state.phase = 'build';
+    YTD.sim.state.gold = 60;
+    runFrames(2);
+  }
+
   const canvas = elements['game-canvas'];
   // pick arrow tower via its button, place at cell (7,3) => px (270,126)
   YTD.ui.buildBtns.arrow.fire('click');
@@ -224,6 +264,35 @@ try {
   runFrames(3);
   check('panel offers mass actions', elements['info-panel'].innerHTML.includes('Улучшить все (2)'),
     'html len ' + elements['info-panel'].innerHTML.length);
+  // 1.0.1: the mass-upgrade button states its price, and the pending count
+  // shrinks as towers reach max level (instead of always showing the total).
+  {
+    const expected = YTD.sim.upgradeAllInfo('arrow');
+    check('mass-upgrade button shows the cost to max them all',
+      expected.towers === 2 && expected.cost > 0 &&
+      elements['info-panel'].innerHTML.includes(`Улучшить все (2) — ${expected.cost} з.`),
+      JSON.stringify(expected));
+    const first = YTD.sim.state.towers[0];
+    YTD.sim.state.gold = 1000;
+    YTD.sim.upgrade(first.id); YTD.sim.upgrade(first.id); // max out one of the two
+    runFrames(3);
+    check('mass-upgrade count drops once a tower is maxed',
+      elements['info-panel'].innerHTML.includes('Улучшить все (1)'),
+      'html len ' + elements['info-panel'].innerHTML.length);
+    YTD.sim.upgradeAllOfType('arrow');
+    runFrames(3);
+    check('mass-upgrade button reports when everything is maxed',
+      elements['info-panel'].innerHTML.includes('Все на максимуме'));
+    // Rebuild the exact pre-check state: two level-0 arrows and 36 gold, so the
+    // sell-all refund below is the same as before this block existed.
+    YTD.sim.sellAllOfType('arrow');
+    YTD.sim.state.gold = 1000;
+    YTD.sim.build('arrow', 7, 3);
+    YTD.sim.build('arrow', 8, 3);
+    YTD.sim.state.gold = 36;
+  }
+  canvas.fire('click', { clientX: 270, clientY: 126, shiftKey: false }); // re-select (7,3)
+  runFrames(2);
   elements['sell-all-btn'].fire('click');
   runFrames(2);
   check('sell-all removes all towers of the type',

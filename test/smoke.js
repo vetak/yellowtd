@@ -291,6 +291,32 @@ check('classic: anti-air never hit ground', !good.stats.aaHitGround);
     `kills ${st.totalKills}, earned ${st.goldEarned}, spent ${st.goldSpent}, leaks ${st.totalLeaks}`);
 }
 
+// 1.0.1: upgradeAllInfo — what "Улучшить все" will cost, without doing it.
+{
+  const sim = newSim();
+  sim.state.gold = 1000;
+  const arrowLevels = E.VersionsConfig.classic.towers.arrow.levels;
+  sim.build('arrow', 10, 3); sim.build('arrow', 13, 3);
+  const both = sim.upgradeAllInfo('arrow');
+  const perTower = arrowLevels[1].cost + arrowLevels[2].cost; // lvl0 -> max
+  check('upgradeAllInfo: counts towers below max and full cost to max them',
+    both.towers === 2 && both.cost === perTower * 2, JSON.stringify(both));
+  // Max one of them out: the pending count and cost must shrink accordingly.
+  const t = sim.towerAt(10, 3);
+  sim.upgrade(t.id); sim.upgrade(t.id);
+  const one = sim.upgradeAllInfo('arrow');
+  check('upgradeAllInfo: maxed towers drop out of the pending count',
+    one.towers === 1 && one.cost === perTower, JSON.stringify(one));
+  sim.upgradeAllOfType('arrow');
+  const none = sim.upgradeAllInfo('arrow');
+  check('upgradeAllInfo: reports nothing pending once all are maxed',
+    none.towers === 0 && none.cost === 0, JSON.stringify(none));
+  check('upgradeAllInfo: unknown tower type is handled', (() => {
+    const r = sim.upgradeAllInfo('nope');
+    return r.towers === 0 && r.cost === 0;
+  })());
+}
+
 // mass actions
 {
   const sim = newSim();

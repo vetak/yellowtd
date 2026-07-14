@@ -15,6 +15,13 @@ const ERROR_TEXT = {
 
 const TARGET_LABEL = { ground: 'земля', air: 'воздух' };
 
+// Upcoming-waves timeline: how many waves ahead to show, and the marker each
+// special wave kind gets on its chip.
+const TIMELINE_LENGTH = 8;
+const TIMELINE_ICON = {
+  air: '✈', boss: '☠', hero: '★', immune: '◆', regen: '✚', extra: '$',
+};
+
 class UI {
   constructor(opts) {
     this.canvas = opts.canvas;
@@ -42,7 +49,7 @@ class UI {
     this.el = {};
     for (const id of [
       'gold-value', 'lives-value', 'wave-value', 'wave-name', 'wave-desc',
-      'wave-timer', 'send-wave-btn', 'build-buttons', 'info-panel', 'controls',
+      'wave-timeline', 'wave-timer', 'send-wave-btn', 'build-buttons', 'info-panel', 'controls',
       'pause-btn', 'menu-btn', 'message', 'overlay', 'overlay-title',
       'overlay-text', 'overlay-stats', 'restart-btn', 'overlay-menu-btn', 'tooltip',
     ]) {
@@ -340,13 +347,16 @@ class UI {
     }
   }
 
-  // Wave summary that honours every spawn group (mixed waves included).
-  // Past the scripted list, an endless run's waves are generated on the fly.
-  _waveBrief(idx) {
+  // Wave descriptor by index: scripted waves come from data, endless runs
+  // generate them on the fly past the scripted list.
+  _waveAt(idx) {
     const sim = this.getSim();
-    const wave = this.wavesCfg[idx] || (sim && sim.endless ? sim._waveAt(idx) : null);
-    if (!wave) return '';
-    const hpMul = sim && sim.difficulty ? (sim.difficulty.hpMul || 1) : 1;
+    return this.wavesCfg[idx] || (sim && sim.endless ? sim._waveAt(idx) : null);
+  }
+
+  // Status badges (air/boss/hero/immune/regen/extra) — shared by the current
+  // wave, the "next up" line and the upcoming-waves timeline.
+  _waveBadges(wave) {
     const badges = [];
     if (wave.groups.some(g => (this.creepsCfg[g.creep] || {}).type === 'air')) {
       badges.push('<span class="badge air">ВОЗДУХ</span>');
@@ -356,35 +366,92 @@ class UI {
     if (wave.immuneToSlow) badges.push('<span class="badge immune">ИММУН</span>');
     if (wave.regen) badges.push('<span class="badge regen">РЕГЕН</span>');
     if (wave.extra) badges.push('<span class="badge extra">БОНУС</span>');
+    return badges;
+  }
+
+  // Wave summary that honours every spawn group (mixed waves included).
+  _waveBrief(idx) {
+    const sim = this.getSim();
+    const wave = this._waveAt(idx);
+    if (!wave) return '';
+    const hpMul = sim && sim.difficulty ? (sim.difficulty.hpMul || 1) : 1;
     const lines = wave.groups.map(g => {
       const base = this.creepsCfg[g.creep];
       const hp = Math.round(g.hp * hpMul);
       const armor = g.armor ? ` · броня ${g.armor}` : '';
       return `<div class="muted">${g.count} × ${base.name} · HP ${hp}${armor} · ${g.bounty} з.</div>`;
     }).join('');
-    return `<div class="wname">${idx + 1}. ${wave.name} ${badges.join(' ')}</div>` +
+    return `<div class="wname">${idx + 1}. ${wave.name} ${this._waveBadges(wave).join(' ')}</div>` +
       lines +
       `<div class="muted">Бонус за волну: ${wave.bonus} з.</div>`;
+  }
+
+  // Compact one-liner for the upcoming wave: name + status badges + roster.
+  // Badges matter most here — knowing AIR/BOSS is coming drives what you build.
+  _waveNextBrief(idx) {
+    const sim = this.getSim();
+    const wave = this._waveAt(idx);
+    if (!wave) return '';
+    const hpMul = sim && sim.difficulty ? (sim.difficulty.hpMul || 1) : 1;
+    const roster = wave.groups.map(g => {
+      const base = this.creepsCfg[g.creep];
+      const hp = Math.round(g.hp * hpMul);
+      const armor = g.armor ? `/бр.${g.armor}` : '';
+      return `${g.count}×${base.name} (HP ${hp}${armor})`;
+    }).join(', ');
+    return `<div class="next-brief">` +
+      `<div class="wname">Далее — ${idx + 1}. ${wave.name} ${this._waveBadges(wave).join(' ')}</div>` +
+      `<div class="muted">${roster}</div>` +
+      `</div>`;
   }
 
   _updateWavePanel(sim) {
     const s = sim.state;
     let html = '';
     let timer = '';
+    // Both phases render the same structure (label + full brief + next brief)
+    // so the panel keeps a stable height and the button below never jumps.
     if (s.phase === 'build') {
-      html = `<div class="phase-label">Следующая волна:</div>` + this._waveBrief(s.waveIndex);
+      html = `<div class="phase-label">Следующая волна:</div>` + this._waveBrief(s.waveIndex) +
+        this._waveNextBrief(s.waveIndex + 1);
       timer = sim.cfg.autoStartWaves !== false
         ? `Автостарт через ${Math.ceil(s.waveTimer)} с`
         : 'Нажмите «Отправить волну»';
     } else if (s.phase === 'wave') {
-      html = `<div class="phase-label">Идёт волна:</div>` + this._waveBrief(s.waveIndex);
-      if (s.waveIndex + 1 < this.wavesCfg.length) {
-        html += `<div class="next-brief"><span class="muted">Далее: ${this.wavesCfg[s.waveIndex + 1].name}</span></div>`;
-      }
+      html = `<div class="phase-label">Идёт волна:</div>` + this._waveBrief(s.waveIndex) +
+        this._waveNextBrief(s.waveIndex + 1);
     }
     this._set('wave-name', html);
     this._set('wave-timer', timer);
     this.el['send-wave-btn'].disabled = s.phase !== 'build';
+    this._updateWaveTimeline(sim);
+  }
+
+  // Upcoming-waves timeline: a compact strip of the next few waves so special
+  // ones (air/boss/immune) are visible several waves ahead, not as a surprise.
+  _updateWaveTimeline(sim) {
+    const s = sim.state;
+    const from = s.phase === 'wave' ? s.waveIndex + 1 : s.waveIndex;
+    const chips = [];
+    for (let i = from; i < from + TIMELINE_LENGTH; i++) {
+      const wave = this._waveAt(i);
+      if (!wave) break;
+      const kinds = [];
+      if (wave.groups.some(g => (this.creepsCfg[g.creep] || {}).type === 'air')) kinds.push('air');
+      if (wave.boss) kinds.push('boss');
+      if (wave.hero) kinds.push('hero');
+      if (wave.immuneToSlow) kinds.push('immune');
+      if (wave.regen) kinds.push('regen');
+      if (wave.extra) kinds.push('extra');
+      const cls = kinds.length ? ' tl-' + kinds[0] : '';
+      const title = `${i + 1}. ${wave.name}`;
+      chips.push(`<span class="tl-chip${cls}" title="${title}">${i + 1}` +
+        (kinds.length ? `<span class="tl-dots">${kinds.map(k => TIMELINE_ICON[k] || '').join('')}</span>` : '') +
+        `</span>`);
+    }
+    this._set('wave-timeline', chips.length
+      ? `<div class="tl-label">Впереди:</div><div class="tl-strip">${chips.join('')}</div>`
+      : '');
   }
 
   _updateBuildButtons(s) {
@@ -415,7 +482,13 @@ class UI {
     const targets = def.targets.map(x => TARGET_LABEL[x] || x).join(' + ');
     const upLabel = next ? `Улучшить — ${next.cost} з.` : 'МАКС. УРОВЕНЬ';
     const upTitle = next ? `→ ${next.damage} урона, ${next.range} дальность, ${next.cooldown} с` : '';
-    const count = sim.towersOfType(t.typeId).length;
+    // "Улучшить все" reflects what's actually left to do: how many towers of
+    // this type are still below max and what finishing them all costs — the
+    // count shrinks as they max out, instead of always showing the total.
+    const upAllInfo = sim.upgradeAllInfo(t.typeId);
+    const upAllLabel = upAllInfo.towers > 0
+      ? `Улучшить все (${upAllInfo.towers}) — ${upAllInfo.cost} з.`
+      : 'Все на максимуме';
     const allRefund = sim.sellAllRefund(t.typeId);
     const html =
       `<div class="sel-title"><canvas id="tower-portrait" width="48" height="48"></canvas>` +
@@ -431,7 +504,8 @@ class UI {
       `<div class="cmd-grid">` +
       `<button id="upgrade-btn" title="${upTitle} (Ctrl — все)" ${!next || s.gold < next.cost ? 'disabled' : ''}>${upLabel}</button>` +
       `<button id="sell-btn">Продать +${sim.sellRefund(t.id)} з.</button>` +
-      `<button id="upgrade-all-btn">Улучшить все (${count})</button>` +
+      `<button id="upgrade-all-btn" title="Улучшает башни этого типа до максимума, пока хватает золота"` +
+      `${upAllInfo.towers === 0 ? ' disabled' : ''}>${upAllLabel}</button>` +
       `<button id="sell-all-btn">Продать все +${allRefund} з.</button>` +
       `</div>`;
     if (this._cache['info-panel'] !== html) {

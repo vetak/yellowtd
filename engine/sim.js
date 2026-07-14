@@ -159,6 +159,23 @@ class Simulation {
     return { ok: true, upgraded, spent };
   }
 
+  // What upgradeAllOfType() would do right now, without doing it: how many
+  // towers are still below max level and what taking them all to max costs.
+  // Read-only and deterministic — safe for the UI to poll every frame.
+  upgradeAllInfo(typeId) {
+    const def = this.towersCfg[typeId];
+    if (!def) return { towers: 0, cost: 0 };
+    const maxLevel = def.levels.length - 1;
+    let towers = 0;
+    let cost = 0;
+    for (const t of this.state.towers) {
+      if (t.typeId !== typeId || t.level >= maxLevel) continue;
+      towers++;
+      for (let lv = t.level + 1; lv <= maxLevel; lv++) cost += def.levels[lv].cost;
+    }
+    return { towers, cost };
+  }
+
   sell(towerId) {
     const s = this.state;
     if (this.isOver()) return { ok: false, error: 'over' };

@@ -518,4 +518,35 @@ h1 { font-size: 26px; }
 .build-btn { padding: 6px 10px; }
 #build-buttons { gap: 4px; }
 #info-panel { min-height: 108px; }
-#wave-panel { min-height: 84px; }
+
+/* --- 1.0.1: панель волны не должна «прыгать» при смене волны --- */
+/* Высота зависела от содержимого (1 или 2 группы крипов, наличие строки
+   «Далее»), из-за чего кнопка «Отправить волну» дёргалась вверх-вниз.
+   Резервируем высоту под худший случай — смешанную волну с двумя группами. */
+#wave-panel { min-height: 188px; display: flex; flex-direction: column; }
+#wave-name { min-height: 92px; }
+.next-brief { margin-top: 6px; border-top: 1px solid rgba(214, 177, 74, 0.2); padding-top: 5px; }
+.next-brief .wname { font-size: 12px; font-weight: 600; display: block; }
+.next-brief .muted { display: block; font-size: 11px; }
+.wave-row { margin-top: auto; }
+
+/* --- 1.0.1: полоска будущих волн (что ждёт впереди) --- */
+#wave-timeline { margin-top: 6px; }
+.tl-label { font-size: 10px; color: #a89e75; text-transform: uppercase; margin-bottom: 3px; }
+.tl-strip { display: flex; gap: 3px; flex-wrap: wrap; }
+.tl-chip {
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: 10px; font-weight: 700; line-height: 1;
+  padding: 3px 4px; border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(214, 177, 74, 0.18);
+  color: #a89e75;
+  cursor: default;
+}
+.tl-chip .tl-dots { font-size: 9px; letter-spacing: -1px; }
+.tl-chip.tl-air { background: #2a5f6e; color: #9fe4f7; border-color: #2a5f6e; }
+.tl-chip.tl-boss { background: #6e2a2a; color: #ffb3a7; border-color: #8e3a3a; }
+.tl-chip.tl-hero { background: #6e2a5f; color: #f7b3e6; border-color: #6e2a5f; }
+.tl-chip.tl-immune { background: #6e5a2a; color: #ffe9a3; border-color: #6e5a2a; }
+.tl-chip.tl-regen { background: #2a6e3a; color: #a7ffb3; border-color: #2a6e3a; }
+.tl-chip.tl-extra { background: #2a4a6e; color: #a3d0ff; border-color: #2a4a6e; }
