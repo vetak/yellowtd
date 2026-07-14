@@ -161,6 +161,16 @@ try {
   check('normal difficulty resources', YTD.sim.state.gold === 60 && YTD.sim.state.lives === 30,
     `gold=${YTD.sim.state.gold}, lives=${YTD.sim.state.lives}`);
 
+  // 1.0.0: first-run tutorial hint shows once, then never again.
+  check('tutorial hint shows on the very first game start',
+    !YTD.Storage.hasSeenTutorial() && !elements['tutorial-hint'].classList.contains('hidden'));
+  elements['tutorial-dismiss'].fire('click');
+  check('dismissing the tutorial hides it and marks it seen',
+    elements['tutorial-hint'].classList.contains('hidden') && YTD.Storage.hasSeenTutorial());
+  YTD.app.startNewGame('normal', 'classic');
+  check('tutorial hint stays hidden on subsequent game starts',
+    elements['tutorial-hint'].classList.contains('hidden'));
+
   runFrames(20);
   check('frame loop runs and HUD updates', elements['gold-value'].innerHTML === '60',
     `gold-value="${elements['gold-value'].innerHTML}"`);
@@ -173,6 +183,15 @@ try {
   canvas.fire('click', { clientX: 270, clientY: 126, shiftKey: false });
   check('canvas click builds tower', YTD.sim.state.towers.length === 1 && YTD.sim.state.gold === 48,
     `towers=${YTD.sim.state.towers.length}, gold=${YTD.sim.state.gold}`);
+
+  // 1.0.0: gold stat shakes when a build fails for lack of gold.
+  YTD.ui.placingType = null;
+  YTD.sim.state.gold = 0;
+  YTD.ui.buildBtns.cannon.fire('click');
+  canvas.fire('click', { clientX: 306, clientY: 126, shiftKey: false });
+  check('insufficient-gold build shakes the gold stat',
+    elements['gold-value'].classList.contains('shake'));
+  YTD.sim.state.gold = 48; // restore for the rest of the flow below
 
   canvas.fire('click', { clientX: 270, clientY: 126, shiftKey: false });
   check('clicking tower selects it', YTD.ui.selectedTowerId === YTD.sim.state.towers[0].id);
@@ -237,6 +256,9 @@ try {
         { type: 'kill' }, { type: 'leak' }, { type: 'waveStart' }, { type: 'victory' }]);
       return true;
     } catch (e) { return false; }
+  })());
+  check('audio click() (menu navigation sound) tolerates missing AudioContext', (() => {
+    try { YTD.audio.click(); return true; } catch (e) { return false; }
   })());
   elements['set-sound'].checked = false;
   elements['set-sound'].fire('change');
@@ -309,9 +331,25 @@ try {
     YTD.app.openMainMenu();
     elements['menu-new'].fire('click');
     elements['version-cards'].children[0].fire('click'); // classic
-    elements['mode-endless'].checked = true;
+
+    // 1.0.0: challenges live on their own sub-screen, reached from difficulty.
+    check('challenges count badge starts empty', elements['challenges-count'].textContent === '');
+    elements['open-challenges'].fire('click');
+    check('opening challenges shows its screen and hides difficulty',
+      !elements['screen-challenges'].classList.contains('hidden') &&
+      elements['screen-difficulty'].classList.contains('hidden'));
     elements['mode-nosell'].checked = true;
     elements['mode-fastcreeps'].checked = true;
+    elements['mode-nosell'].fire('change');
+    elements['mode-fastcreeps'].fire('change');
+    check('challenges count badge reflects 2 active challenges',
+      elements['challenges-count'].textContent === '(2)');
+    elements['back-from-challenges'].fire('click');
+    check('back from challenges returns to the difficulty screen',
+      !elements['screen-difficulty'].classList.contains('hidden') &&
+      elements['screen-challenges'].classList.contains('hidden'));
+
+    elements['mode-endless'].checked = true;
     const diffBtns = elements['diff-buttons'];
     diffBtns.children[diffBtns.children.length - 3].fire('click'); // normal (of the latest 4-button batch)
     check('endless run starts with the chosen modifiers',

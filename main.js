@@ -121,6 +121,21 @@
     el.textContent = 'YellowTD v' + GAME_VERSION + ver + diff + mode;
   }
 
+  // First-run tutorial hint: a small dismissible card over the battlefield,
+  // shown once ever (any version/difficulty), never again after dismissed.
+  const tutorialEl = document.getElementById('tutorial-hint');
+  function maybeShowTutorial() {
+    if (Storage.hasSeenTutorial() || !tutorialEl) return;
+    tutorialEl.classList.remove('hidden');
+  }
+  const tutorialDismissBtn = document.getElementById('tutorial-dismiss');
+  if (tutorialDismissBtn) {
+    tutorialDismissBtn.addEventListener('click', () => {
+      Storage.markTutorialSeen();
+      if (tutorialEl) tutorialEl.classList.add('hidden');
+    });
+  }
+
   function enterGame() {
     renderer.reset();
     ui.reset();
@@ -131,6 +146,7 @@
     menuMode = 'pause';
     menu.close();
     updateFooter();
+    maybeShowTutorial();
   }
 
   function startNewGame(diffId, verId, modeOptions) {
@@ -273,6 +289,15 @@
     onExportSave: exportSave,
     onImportSave: importSave,
   });
+
+  // Subtle click sound for menu navigation, delegated from the menu root so
+  // every button (present and future) gets it without wiring each one.
+  const menuRoot = document.getElementById('menu');
+  if (menuRoot && menuRoot.addEventListener) {
+    menuRoot.addEventListener('click', (e) => {
+      if (e && e.target && e.target.tagName === 'BUTTON') audio.click();
+    });
+  }
 
   applyVersion(versionId);
 

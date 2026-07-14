@@ -19,6 +19,17 @@
         <button id="overlay-menu-btn">Главное меню</button>
       </div>
     </div>
+    <div id="tutorial-hint" class="hidden">
+      <div class="tutorial-title">Как играть</div>
+      <ul>
+        <li>Выберите башню — кнопка слева или клавиши 1–7</li>
+        <li>Клик по свободной клетке — башня построена</li>
+        <li>Клик по построенной башне — улучшить или продать</li>
+        <li>Shift/Ctrl + клик — строить несколько подряд</li>
+        <li>Пробел — пауза, Esc — меню</li>
+      </ul>
+      <button id="tutorial-dismiss">Понятно, начинаем!</button>
+    </div>
   </div>
   <aside id="sidebar">
     <h1>Yellow<span>TD</span></h1>
@@ -53,7 +64,7 @@
 </div>
 
 <div id="menu" class="hidden">
-  <div class="menu-card">
+  <div class="menu-card" id="menu-card">
     <div class="menu-title">Yellow<span>TD</span></div>
     <div id="menu-version"></div>
     <div id="menu-message"></div>
@@ -90,12 +101,18 @@
         <span>Режим Эндлесс (без победы — до поражения, счёт = волна)</span>
         <input type="checkbox" id="mode-endless">
       </label>
-      <div class="challenge-title">Испытания (необязательно, для острых ощущений)</div>
+      <button id="open-challenges" class="menu-back">Испытания… <span id="challenges-count"></span></button>
+      <button id="back-from-difficulty" class="menu-back">Назад</button>
+    </div>
+
+    <div id="screen-challenges" class="menu-screen hidden">
+      <div class="screen-title">Испытания</div>
+      <div class="muted">Необязательно — для острых ощущений. Свободно комбинируются.</div>
       <label class="set-row"><span>Без продажи башен</span><input type="checkbox" id="mode-nosell"></label>
       <label class="set-row"><span>Одна башня каждого типа</span><input type="checkbox" id="mode-onetype"></label>
       <label class="set-row"><span>Половина золота</span><input type="checkbox" id="mode-halfgold"></label>
       <label class="set-row"><span>Крипы быстрее (×1.5)</span><input type="checkbox" id="mode-fastcreeps"></label>
-      <button id="back-from-difficulty" class="menu-back">Назад</button>
+      <button id="back-from-challenges" class="menu-back">Назад</button>
     </div>
 
     <div id="screen-records" class="menu-screen hidden">

@@ -128,6 +128,14 @@ class SoundEngine {
     if (leak) this._alarm();
   }
 
+  // Short, subtle UI click — menu navigation shouldn't feel silent.
+  // Separate from ingestEvents() since it's driven by DOM clicks, not sim ticks.
+  click() {
+    if (!this.enabled || !this.ctx) return;
+    if (this.ctx.state === 'suspended') { try { this.ctx.resume(); } catch (e) {} }
+    this._play({ type: 'triangle', freq: 720, to: 900, dur: 0.045, vol: 0.09 });
+  }
+
   // ---------------------------------------------------------- synth helpers
 
   _noiseBuf() {

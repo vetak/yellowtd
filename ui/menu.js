@@ -4,6 +4,7 @@
   function Menu(opts) {
     this.opts = opts;
     this.root = document.getElementById('menu');
+    this.cardEl = document.getElementById('menu-card');
     this.versionEl = document.getElementById('menu-version');
     this.versionEl.textContent = 'Версия ' + (opts.version || 'dev');
 
@@ -12,6 +13,7 @@
       pause: document.getElementById('screen-pause'),
       version: document.getElementById('screen-version'),
       difficulty: document.getElementById('screen-difficulty'),
+      challenges: document.getElementById('screen-challenges'),
       settings: document.getElementById('screen-settings'),
       records: document.getElementById('screen-records'),
       exit: document.getElementById('screen-exit'),
@@ -45,9 +47,12 @@
     this.chkOneType = document.getElementById('mode-onetype');
     this.chkHalfGold = document.getElementById('mode-halfgold');
     this.chkFastCreeps = document.getElementById('mode-fastcreeps');
+    this.btnOpenChallenges = document.getElementById('open-challenges');
+    this.challengesCountEl = document.getElementById('challenges-count');
 
     this.btnBackVersion = document.getElementById('back-from-version');
     this.btnBackDiff = document.getElementById('back-from-difficulty');
+    this.btnBackChallenges = document.getElementById('back-from-challenges');
     this.btnBackSettings = document.getElementById('back-from-settings');
     this.btnBackRecords = document.getElementById('back-from-records');
     this.btnBackExit = document.getElementById('back-from-exit');
@@ -155,6 +160,14 @@
     return { endless: !!(this.chkEndless && this.chkEndless.checked), modifiers };
   };
 
+  // Small "N активно" hint on the difficulty screen's "Испытания…" button,
+  // so picking a challenge doesn't disappear into a sub-screen unnoticed.
+  Menu.prototype.updateChallengesCount = function () {
+    if (!this.challengesCountEl) return;
+    const n = Object.keys(this.readModeOptions().modifiers).length;
+    this.challengesCountEl.textContent = n > 0 ? `(${n})` : '';
+  };
+
   Menu.prototype.buildDifficultyButtons = function () {
     const ids = Object.keys(this.opts.difficulties || {});
     this.diffButtons.innerHTML = '';
@@ -244,6 +257,12 @@
 
     this.btnBackVersion.addEventListener('click', () => this.show(this.mode === 'pause' ? 'pause' : 'main'));
     this.btnBackDiff.addEventListener('click', () => this.show('version'));
+    if (this.btnOpenChallenges) this.btnOpenChallenges.addEventListener('click', () => this.show('challenges'));
+    if (this.btnBackChallenges) this.btnBackChallenges.addEventListener('click', () => this.show('difficulty'));
+    const onChallengeChange = () => this.updateChallengesCount();
+    [this.chkNoSell, this.chkOneType, this.chkHalfGold, this.chkFastCreeps].forEach((chk) => {
+      if (chk) chk.addEventListener('change', onChallengeChange);
+    });
     this.btnBackSettings.addEventListener('click', () => this.show(this.prevScreen || (this.mode === 'pause' ? 'pause' : 'main')));
     this.btnBackExit.addEventListener('click', () => this.show('main'));
 
@@ -305,11 +324,19 @@
     if (name === 'settings' || name === 'records') {
       this.prevScreen = this.currentScreen || (this.mode === 'pause' ? 'pause' : 'main');
     }
-    if (name === 'difficulty') this.buildDifficultyButtons();
+    if (name === 'difficulty') { this.buildDifficultyButtons(); this.updateChallengesCount(); }
     if (name === 'records') this.buildRecords();
     Object.keys(this.screens).forEach((key) => {
       this.screens[key].classList.toggle('hidden', key !== name);
     });
+    // Small "pop" on the card itself when the screen actually changes — the
+    // inner screens just toggle display:none, so this is what gives the
+    // transition a bit of life without fighting display-none transitions.
+    if (name !== this.currentScreen && this.cardEl && this.cardEl.classList) {
+      this.cardEl.classList.remove('pop');
+      void this.cardEl.offsetWidth; // force reflow so the animation restarts
+      this.cardEl.classList.add('pop');
+    }
     this.currentScreen = name;
     this.syncSettings();
     this.refresh();

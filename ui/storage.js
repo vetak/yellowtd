@@ -9,6 +9,7 @@ const Storage = (() => {
   const PROGRESS_KEY = 'yellowtd.progress';
   const RECORDS_PREFIX = 'yellowtd.records.';
   const MAX_RECORDS = 5;
+  const TUTORIAL_KEY = 'yellowtd.tutorialSeen';
 
   let backend;
   try {
@@ -49,11 +50,13 @@ const Storage = (() => {
     loadGame(versionId) { return readJson(SAVE_PREFIX + versionId); },
     clearGame(versionId) { try { backend.removeItem(SAVE_PREFIX + versionId); } catch (e) {} },
     // Most recent save across the given version ids (for the Continue button).
+    // Ties (same millisecond — possible when scripting rapid saves, e.g. in
+    // tests) favor the later id in versionIds, so "most recent" is deterministic.
     latestSave(versionIds) {
       let best = null;
       for (const id of versionIds) {
         const save = readJson(SAVE_PREFIX + id);
-        if (save && save.state && (!best || (save.savedAt || 0) > (best.savedAt || 0))) {
+        if (save && save.state && (!best || (save.savedAt || 0) >= (best.savedAt || 0))) {
           best = save;
         }
       }
@@ -89,5 +92,9 @@ const Storage = (() => {
     getRecords(versionId, difficultyId) {
       return readJson(RECORDS_PREFIX + versionId + '.' + difficultyId) || [];
     },
+
+    // ---- First-run tutorial hint: shown once, dismissed forever after.
+    hasSeenTutorial() { return readJson(TUTORIAL_KEY) === true; },
+    markTutorialSeen() { writeJson(TUTORIAL_KEY, true); },
   };
 })();

@@ -292,6 +292,17 @@ class UI {
   _notify(codeOrText) {
     this.message.text = ERROR_TEXT[codeOrText] || codeOrText;
     this.message.until = performance.now() + 2200;
+    if (codeOrText === 'gold') this._shake('gold-value');
+  }
+
+  // Brief shake on a stat to draw the eye to why an action was rejected
+  // (e.g. not enough gold). Purely visual — retriggerable via reflow.
+  _shake(id) {
+    const el = this.el[id];
+    if (!el || !el.classList) return;
+    el.classList.remove('shake');
+    void el.offsetWidth;
+    el.classList.add('shake');
   }
 
   _set(id, html) {

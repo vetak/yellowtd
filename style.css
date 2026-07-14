@@ -411,6 +411,43 @@ body {
   color: rgba(244, 224, 150, 0.8);
 }
 
+/* --- 1.0.0: screen transitions and battle feedback --- */
+@keyframes menu-card-pop {
+  from { opacity: 0; transform: scale(0.97) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.menu-card.pop { animation: menu-card-pop 0.18s ease-out; }
+
+@keyframes overlay-fade-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+#overlay:not(.hidden) { animation: overlay-fade-in 0.28s ease-out; }
+
+@keyframes shake-x {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+.shake { animation: shake-x 0.4s; }
+
+#tutorial-hint {
+  position: absolute; top: 14px; left: 14px; z-index: 4;
+  max-width: 280px;
+  background: linear-gradient(180deg, rgba(31,22,15,0.97), rgba(18,12,6,0.98));
+  border: 1px solid rgba(214, 177, 74, 0.4);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  animation: overlay-fade-in 0.25s ease-out;
+}
+#tutorial-hint.hidden { display: none; }
+.tutorial-title { font-weight: 700; color: #f4cb48; margin-bottom: 8px; font-size: 15px; }
+#tutorial-hint ul { margin: 0 0 10px 18px; padding: 0; }
+#tutorial-hint li { font-size: 12px; color: #eae3c8; margin-bottom: 4px; line-height: 1.4; }
+#tutorial-dismiss { width: 100%; }
+
 /* --- фиксы вёрстки 0.5.1: длинные русские подписи в ряду управления --- */
 /* «Пауза»/«Продолжить» и «Меню» не влезают в 5 равных колонок сайдбара:  */
 /* раскладываем в два ряда — [Пауза | Меню] и [x1 | x2 | x3].             */
