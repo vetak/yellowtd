@@ -110,6 +110,22 @@
         <span>Показывать радиус башни при наведении</span>
         <input type="checkbox" id="set-range">
       </label>
+      <label class="set-row">
+        <span>Звук</span>
+        <input type="checkbox" id="set-sound">
+      </label>
+      <label class="set-row">
+        <span>Громкость звука</span>
+        <input type="range" id="set-volume" min="0" max="100" step="5">
+      </label>
+      <label class="set-row">
+        <span>Музыка</span>
+        <input type="checkbox" id="set-music">
+      </label>
+      <label class="set-row">
+        <span>Громкость музыки</span>
+        <input type="range" id="set-music-volume" min="0" max="100" step="5">
+      </label>
       <button id="back-from-settings" class="menu-back">Назад</button>
     </div>
 
@@ -135,6 +151,7 @@
 <script src="engine/path.js"></script>
 <script src="engine/sim.js"></script>
 <script src="render/renderer.js"></script>
+<script src="audio/audio.js"></script>
 <script src="ui/storage.js"></script>
 <script src="ui/platform.js"></script>
 <script src="ui/menu.js"></script>

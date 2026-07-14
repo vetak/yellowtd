@@ -97,7 +97,7 @@ const files = [
   'data/versions/canyon/map.js', 'data/versions/canyon/creeps.js',
   'data/versions/canyon/towers.js', 'data/versions/canyon/waves.js',
   'data/versions.js',
-  'engine/path.js', 'engine/sim.js', 'render/renderer.js',
+  'engine/path.js', 'engine/sim.js', 'render/renderer.js', 'audio/audio.js',
   'ui/storage.js', 'ui/platform.js', 'ui/menu.js', 'ui/ui.js', 'main.js',
 ];
 
@@ -225,6 +225,32 @@ try {
   elements['set-floating'].fire('change');
   check('settings change applies to renderer', YTD.renderer.showFloatingText === false);
   check('settings change persists in settings object', YTD.settings.floatingText === false);
+
+  // --- 0.9.0: audio layer (degrades to a silent no-op without AudioContext) ---
+  check('audio engine present', !!YTD.audio);
+  check('audio ingest tolerates events without AudioContext', (() => {
+    try {
+      YTD.audio.ingestEvents([{ type: 'shot' }, { type: 'explosion' }, { type: 'chainHit' },
+        { type: 'kill' }, { type: 'leak' }, { type: 'waveStart' }, { type: 'victory' }]);
+      return true;
+    } catch (e) { return false; }
+  })());
+  elements['set-sound'].checked = false;
+  elements['set-sound'].fire('change');
+  check('sound toggle reaches audio engine and settings',
+    YTD.audio.enabled === false && YTD.settings.soundOn === false);
+  elements['set-volume'].value = '30';
+  elements['set-volume'].fire('input');
+  check('volume slider reaches audio engine',
+    Math.abs(YTD.audio.volume - 0.3) < 1e-6 && Math.abs(YTD.settings.soundVolume - 0.3) < 1e-6);
+  elements['set-music'].checked = true;
+  elements['set-music'].fire('change');
+  check('music toggle reaches audio engine and settings',
+    YTD.audio.musicOn === true && YTD.settings.musicOn === true);
+  elements['set-music-volume'].value = '25';
+  elements['set-music-volume'].fire('input');
+  check('music volume slider reaches audio engine',
+    Math.abs(YTD.audio.musicVolume - 0.25) < 1e-6 && Math.abs(YTD.settings.musicVolume - 0.25) < 1e-6);
 
   // pause toggle
   elements['pause-btn'].fire('click');

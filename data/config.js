@@ -1,5 +1,5 @@
 // Global game rules. Everything tunable lives in data/ — the engine hardcodes nothing.
-const GAME_VERSION = '0.8.0';
+const GAME_VERSION = '0.9.0';
 
 const GameConfig = {
   tickRate: 20,           // fixed simulation steps per second (deterministic)
@@ -34,4 +34,8 @@ const DefaultSettings = {
   autoStartWaves: true,   // countdown between waves; off = manual Send Wave only
   floatingText: true,     // +gold / -lives popups on the battlefield
   rangeOnHover: true,     // show tower range circle on hover (not only selection)
+  soundOn: true,          // WebAudio sound effects on/off
+  soundVolume: 0.6,       // master sound volume 0..1
+  musicOn: false,         // procedural ambient music on/off
+  musicVolume: 0.4,       // music volume 0..1
 };

@@ -46,6 +46,10 @@
     this.chkAuto = document.getElementById('set-autostart');
     this.chkFloating = document.getElementById('set-floating');
     this.chkRange = document.getElementById('set-range');
+    this.chkSound = document.getElementById('set-sound');
+    this.rngVolume = document.getElementById('set-volume');
+    this.chkMusic = document.getElementById('set-music');
+    this.rngMusic = document.getElementById('set-music-volume');
 
     this.diffButtons = document.getElementById('diff-buttons');
     this.versionCards = document.getElementById('version-cards');
@@ -188,6 +192,10 @@
       this.opts.settings.autoStartWaves = !!this.chkAuto.checked;
       this.opts.settings.floatingText = !!this.chkFloating.checked;
       this.opts.settings.rangeOnHover = !!this.chkRange.checked;
+      this.opts.settings.soundOn = !!this.chkSound.checked;
+      this.opts.settings.soundVolume = Math.max(0, Math.min(1, (Number(this.rngVolume.value) || 0) / 100));
+      this.opts.settings.musicOn = !!this.chkMusic.checked;
+      this.opts.settings.musicVolume = Math.max(0, Math.min(1, (Number(this.rngMusic.value) || 0) / 100));
       this.opts.onSettingsChange();
     };
 
@@ -195,6 +203,12 @@
     this.chkAuto.addEventListener('change', onSettingInput);
     this.chkFloating.addEventListener('change', onSettingInput);
     this.chkRange.addEventListener('change', onSettingInput);
+    this.chkSound.addEventListener('change', onSettingInput);
+    this.rngVolume.addEventListener('input', onSettingInput);
+    this.rngVolume.addEventListener('change', onSettingInput);
+    this.chkMusic.addEventListener('change', onSettingInput);
+    this.rngMusic.addEventListener('input', onSettingInput);
+    this.rngMusic.addEventListener('change', onSettingInput);
   };
 
   Menu.prototype.syncSettings = function () {
@@ -202,6 +216,12 @@
     this.chkAuto.checked = !!this.opts.settings.autoStartWaves;
     this.chkFloating.checked = !!this.opts.settings.floatingText;
     this.chkRange.checked = !!this.opts.settings.rangeOnHover;
+    this.chkSound.checked = this.opts.settings.soundOn !== false;
+    this.rngVolume.value = String(Math.round(
+      (this.opts.settings.soundVolume != null ? this.opts.settings.soundVolume : 0.6) * 100));
+    this.chkMusic.checked = this.opts.settings.musicOn === true;
+    this.rngMusic.value = String(Math.round(
+      (this.opts.settings.musicVolume != null ? this.opts.settings.musicVolume : 0.4) * 100));
   };
 
   Menu.prototype.refresh = function () {

@@ -17,6 +17,7 @@
     creeps: VersionsConfig[versionId].creeps,
   });
   renderer.showFloatingText = settings.floatingText;
+  const audio = new SoundEngine(settings);
   const loop = { paused: false, speed: settings.defaultSpeed };
 
   let sim = null;
@@ -158,6 +159,10 @@
     Storage.saveSettings(settings);
     renderer.showFloatingText = settings.floatingText;
     loop.speed = settings.defaultSpeed;
+    audio.setEnabled(settings.soundOn !== false);
+    audio.setVolume(settings.soundVolume != null ? settings.soundVolume : 0.6);
+    audio.setMusicEnabled(settings.musicOn === true);
+    audio.setMusicVolume(settings.musicVolume != null ? settings.musicVolume : 0.4);
     if (sim) sim.cfg.autoStartWaves = settings.autoStartWaves;
   }
 
@@ -240,7 +245,7 @@
   window.YTD = {
     get sim() { return sim; },
     get versionId() { return versionId; },
-    ui, renderer, loop, menu, settings, Storage,
+    ui, renderer, audio, loop, menu, settings, Storage,
     app: {
       startNewGame,
       continueGame,
@@ -256,6 +261,10 @@
     window.addEventListener('beforeunload', () => {
       if (appState === 'playing') saveNow();
     });
+    // AudioContext may only start after a user gesture (autoplay policy).
+    const unlockAudio = () => audio.unlock();
+    window.addEventListener('pointerdown', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
   }
 
   let last = performance.now();
@@ -274,6 +283,7 @@
       while (acc >= sim.dt && steps < MAX_STEPS_PER_FRAME) {
         sim.step();
         renderer.ingestEvents(sim.state.events);
+        audio.ingestEvents(sim.state.events);
         for (const ev of sim.state.events) {
           if (ev.type === 'waveStart' || ev.type === 'waveEnd') saveNow();
           else if (ev.type === 'victory' || ev.type === 'defeat') Storage.clearGame(versionId);
