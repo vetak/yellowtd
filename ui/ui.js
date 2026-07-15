@@ -224,7 +224,7 @@ class UI {
   _setZoom(z) {
     this.zoom = Math.max(1, Math.min(3, Math.round(z * 2) / 2));
     if (this.el['board-scroll']) {
-      this.el['board-scroll'].style.setProperty('--board-zoom', this.zoom);
+      this.el['board-scroll'].style.setProperty('--board-zoom', String(this.zoom));
     }
   }
 
@@ -542,9 +542,9 @@ class UI {
       if (this.selectedTowerId) this.selectedTowerId = null;
       const keyCount = Object.keys(this.towersCfg).length;
       this._set('info-panel',
-        `<div class="muted">Выберите башню (кнопки или клавиши 1–${keyCount}) и кликните по свободной клетке.` +
-        ` Shift/Ctrl+клик — строить несколько подряд. Клик по построенной башне — улучшение и продажа.` +
-        ` ПКМ — отмена. Пробел — пауза. Esc — меню.</div>`);
+        `<div class="muted">Выберите башню (кнопки или клавиши 1–${keyCount}) и тапните по свободной клетке.` +
+        ` Тап по построенной башне — улучшение и продажа. Shift/Ctrl+клик — строить несколько подряд.` +
+        ` Пауза и меню — кнопки внизу панели (пробел/Esc на ПК).</div>`);
       return;
     }
     const def = this.towersCfg[t.typeId];
