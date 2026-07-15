@@ -23,7 +23,17 @@ const VersionsConfig = {
     creeps: CanyonVersion.creeps,
     waves: CanyonVersion.waves,
   },
+  wastes: {
+    id: 'wastes',
+    name: 'Пустоши',
+    desc: 'Endgame: длинный шестиполосный серпантин, полный арсенал из 8 башен (вкл. грозовую), 24 самых крепких волны и два босса.',
+    unlockedBy: 'canyon',
+    map: WastesVersion.map,
+    towers: WastesVersion.towers,
+    creeps: WastesVersion.creeps,
+    waves: WastesVersion.waves,
+  },
 };
 
 // Display order of the version cards in the menu (also the progression order).
-const VersionOrder = ['classic', 'canyon'];
+const VersionOrder = ['classic', 'canyon', 'wastes'];

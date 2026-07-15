@@ -99,6 +99,8 @@ const files = [
   'data/versions/classic/towers.js', 'data/versions/classic/waves.js',
   'data/versions/canyon/map.js', 'data/versions/canyon/creeps.js',
   'data/versions/canyon/towers.js', 'data/versions/canyon/waves.js',
+  'data/versions/wastes/map.js', 'data/versions/wastes/creeps.js',
+  'data/versions/wastes/towers.js', 'data/versions/wastes/waves.js',
   'data/versions.js',
   'engine/path.js', 'engine/sim.js', 'render/renderer.js', 'audio/audio.js',
   'ui/storage.js', 'ui/platform.js', 'ui/menu.js', 'ui/ui.js', 'main.js',
@@ -149,10 +151,14 @@ try {
   check('New Game opens version screen',
     !elements['screen-version'].classList.contains('hidden') &&
     elements['screen-main'].classList.contains('hidden'));
-  check('version screen shows both version cards',
-    elements['version-cards'].children.length === 2 &&
+  check('version screen shows all three version cards',
+    elements['version-cards'].children.length === 3 &&
     elements['version-cards'].children[0].getAttribute('data-version') === 'classic' &&
-    elements['version-cards'].children[1].getAttribute('data-version') === 'canyon');
+    elements['version-cards'].children[1].getAttribute('data-version') === 'canyon' &&
+    elements['version-cards'].children[2].getAttribute('data-version') === 'wastes');
+  check('wastes (last map) starts locked, classic starts open',
+    !String(elements['version-cards'].children[0].className).includes('locked') &&
+    String(elements['version-cards'].children[2].className).includes('locked'));
   elements['version-cards'].children[0].fire('click');
   check('version card click opens difficulty screen',
     !elements['screen-difficulty'].classList.contains('hidden') &&
