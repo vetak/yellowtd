@@ -103,6 +103,8 @@ const files = [
   'data/versions/wastes/towers.js', 'data/versions/wastes/waves.js',
   'data/versions/vortex/map.js', 'data/versions/vortex/creeps.js',
   'data/versions/vortex/towers.js', 'data/versions/vortex/waves.js',
+  'data/versions/rift/map.js', 'data/versions/rift/creeps.js',
+  'data/versions/rift/towers.js', 'data/versions/rift/waves.js',
   'data/versions.js',
   'engine/path.js', 'engine/sim.js', 'render/renderer.js', 'audio/audio.js',
   'ui/storage.js', 'ui/platform.js', 'ui/menu.js', 'ui/ui.js', 'main.js',
@@ -153,15 +155,16 @@ try {
   check('New Game opens version screen',
     !elements['screen-version'].classList.contains('hidden') &&
     elements['screen-main'].classList.contains('hidden'));
-  check('version screen shows all four version cards',
-    elements['version-cards'].children.length === 4 &&
+  check('version screen shows all five version cards',
+    elements['version-cards'].children.length === 5 &&
     elements['version-cards'].children[0].getAttribute('data-version') === 'classic' &&
     elements['version-cards'].children[1].getAttribute('data-version') === 'canyon' &&
     elements['version-cards'].children[2].getAttribute('data-version') === 'wastes' &&
-    elements['version-cards'].children[3].getAttribute('data-version') === 'vortex');
+    elements['version-cards'].children[3].getAttribute('data-version') === 'rift' &&
+    elements['version-cards'].children[4].getAttribute('data-version') === 'vortex');
   check('vortex (last map) starts locked, classic starts open',
     !String(elements['version-cards'].children[0].className).includes('locked') &&
-    String(elements['version-cards'].children[3].className).includes('locked'));
+    String(elements['version-cards'].children[4].className).includes('locked'));
   elements['version-cards'].children[0].fire('click');
   check('version card click opens difficulty screen',
     !elements['screen-difficulty'].classList.contains('hidden') &&

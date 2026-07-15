@@ -18,6 +18,8 @@ const files = [
   'data/versions/wastes/towers.js', 'data/versions/wastes/waves.js',
   'data/versions/vortex/map.js', 'data/versions/vortex/creeps.js',
   'data/versions/vortex/towers.js', 'data/versions/vortex/waves.js',
+  'data/versions/rift/map.js', 'data/versions/rift/creeps.js',
+  'data/versions/rift/towers.js', 'data/versions/rift/waves.js',
   'data/versions.js',
   'engine/path.js', 'engine/sim.js',
 ];
@@ -132,17 +134,22 @@ function check(label, cond, extra) {
 
 // ======================================================= version registry
 
-check('registry: four maps registered (classic/canyon/wastes/vortex)',
-  E.VersionOrder.length === 4 && !!E.VersionsConfig.classic && !!E.VersionsConfig.canyon &&
-  !!E.VersionsConfig.wastes && !!E.VersionsConfig.vortex);
-check('registry: progression chain (classic→canyon→wastes→vortex)',
+check('registry: five maps registered (classic/canyon/wastes/rift/vortex)',
+  E.VersionOrder.length === 5 && !!E.VersionsConfig.classic && !!E.VersionsConfig.canyon &&
+  !!E.VersionsConfig.wastes && !!E.VersionsConfig.rift && !!E.VersionsConfig.vortex);
+check('registry: progression chain (classic→canyon→wastes→rift→vortex)',
   !E.VersionsConfig.classic.unlockedBy &&
   E.VersionsConfig.canyon.unlockedBy === 'classic' &&
   E.VersionsConfig.wastes.unlockedBy === 'canyon' &&
-  E.VersionsConfig.vortex.unlockedBy === 'wastes');
+  E.VersionsConfig.rift.unlockedBy === 'wastes' &&
+  E.VersionsConfig.vortex.unlockedBy === 'rift');
 check('registry: vortex is a spiral (26 waves, three bosses)',
   E.VersionsConfig.vortex.waves.length === 26 &&
   E.VersionsConfig.vortex.waves.filter(w => w.boss).length === 3);
+check('registry: rift is a vertical serpentine (25 waves, two bosses)',
+  E.VersionsConfig.rift.waves.length === 25 &&
+  E.VersionsConfig.rift.waves.filter(w => w.boss).length === 2 &&
+  Object.keys(E.VersionsConfig.rift.towers).length === 8);
 check('registry: wastes has the full 8-tower arsenal (incl. storm)',
   Object.keys(E.VersionsConfig.wastes.towers).length === 8 &&
   'storm' in E.VersionsConfig.wastes.towers &&
@@ -860,6 +867,127 @@ check('vortex: save/restore at wave 9 → identical outcome',
   vresumed.result === vgood.result && vresumed.lives === vgood.lives &&
   vresumed.gold === vgood.gold && vresumed.ticks === vgood.ticks,
   `lives ${vresumed.lives}/${vgood.lives}, gold ${vresumed.gold}/${vgood.gold}`);
+
+// -------------------------------------------------- 1.7.0: Rift (vertical map)
+// Vertical serpentine: six top-to-bottom lanes. A horizontal row of towers in
+// the gap columns (rows 8-10) covers every lane. Difficulty between Wastes and
+// Vortex. Between the second (Wastes) and final (Vortex) maps in the chain.
+const planGoodRift = [
+  { wave: 0, action: 'build', tower: 'arrow', col: 3, row: 8 },
+  { wave: 0, action: 'build', tower: 'arrow', col: 3, row: 9 },
+  { wave: 1, action: 'upgrade', col: 3, row: 8 },
+  { wave: 1, action: 'upgrade', col: 3, row: 9 },
+  { wave: 2, action: 'build', tower: 'frost', col: 4, row: 8 },
+  { wave: 3, action: 'build', tower: 'antiair', col: 4, row: 9 },
+  { wave: 4, action: 'build', tower: 'cannon', col: 3, row: 10 },
+  { wave: 4, action: 'upgrade', col: 3, row: 10 },
+  { wave: 5, action: 'build', tower: 'storm', col: 6, row: 9 },
+  { wave: 5, action: 'upgrade', col: 6, row: 9 },
+  { wave: 6, action: 'build', tower: 'multishot', col: 7, row: 8 },
+  { wave: 6, action: 'upgrade', col: 7, row: 8 },
+  { wave: 6, action: 'build', tower: 'arrow', col: 6, row: 8 },
+  { wave: 7, action: 'build', tower: 'poison', col: 6, row: 10 },
+  { wave: 7, action: 'upgrade', col: 6, row: 10 },
+  { wave: 7, action: 'upgrade', col: 6, row: 8 },
+  { wave: 8, action: 'build', tower: 'poison', col: 9, row: 9 },
+  { wave: 8, action: 'upgrade', col: 9, row: 9 },
+  { wave: 8, action: 'build', tower: 'sniper', col: 10, row: 9 },
+  { wave: 9, action: 'upgrade', col: 10, row: 9 },
+  { wave: 9, action: 'upgrade', col: 3, row: 8 },
+  { wave: 9, action: 'upgrade', col: 3, row: 9 },
+  { wave: 10, action: 'build', tower: 'storm', col: 9, row: 8 },
+  { wave: 10, action: 'upgrade', col: 9, row: 8 },
+  { wave: 10, action: 'build', tower: 'cannon', col: 10, row: 10 },
+  { wave: 10, action: 'build', tower: 'arrow', col: 4, row: 7 },
+  { wave: 11, action: 'upgrade', col: 10, row: 10 },
+  { wave: 11, action: 'upgrade', col: 9, row: 9 },
+  { wave: 11, action: 'upgrade', col: 6, row: 9 },
+  { wave: 11, action: 'upgrade', col: 4, row: 7 },
+  { wave: 12, action: 'upgrade', col: 10, row: 9 },
+  { wave: 12, action: 'upgrade', col: 9, row: 8 },
+  { wave: 12, action: 'upgrade', col: 4, row: 7 },
+  { wave: 13, action: 'build', tower: 'storm', col: 12, row: 9 },
+  { wave: 13, action: 'upgrade', col: 12, row: 9 },
+  { wave: 14, action: 'build', tower: 'cannon', col: 13, row: 8 },
+  { wave: 14, action: 'upgrade', col: 13, row: 8 },
+  { wave: 14, action: 'build', tower: 'poison', col: 7, row: 10 },
+  { wave: 15, action: 'build', tower: 'antiair', col: 12, row: 10 },
+  { wave: 15, action: 'upgrade', col: 12, row: 10 },
+  { wave: 15, action: 'build', tower: 'poison', col: 13, row: 9 },
+  { wave: 15, action: 'upgrade', col: 7, row: 10 },
+  { wave: 16, action: 'upgrade', col: 13, row: 9 },
+  { wave: 16, action: 'build', tower: 'storm', col: 15, row: 9 },
+  { wave: 16, action: 'upgrade', col: 15, row: 9 },
+  { wave: 16, action: 'upgrade', col: 7, row: 10 },
+  { wave: 17, action: 'build', tower: 'multishot', col: 16, row: 8 },
+  { wave: 17, action: 'upgrade', col: 16, row: 8 },
+  { wave: 17, action: 'upgrade', col: 6, row: 9 },
+  { wave: 18, action: 'build', tower: 'antiair', col: 15, row: 10 },
+  { wave: 18, action: 'upgrade', col: 15, row: 10 },
+  { wave: 18, action: 'build', tower: 'storm', col: 13, row: 10 },
+  { wave: 19, action: 'build', tower: 'sniper', col: 16, row: 10 },
+  { wave: 19, action: 'upgrade', col: 16, row: 10 },
+  { wave: 19, action: 'upgrade', col: 9, row: 9 },
+  { wave: 19, action: 'upgrade', col: 13, row: 10 },
+  { wave: 20, action: 'build', tower: 'poison', col: 16, row: 9 },
+  { wave: 20, action: 'upgrade', col: 16, row: 9 },
+  { wave: 20, action: 'upgrade', col: 12, row: 9 },
+  { wave: 20, action: 'upgrade', col: 13, row: 10 },
+  { wave: 21, action: 'upgrade', col: 3, row: 10 },
+  { wave: 21, action: 'upgrade', col: 13, row: 8 },
+  { wave: 21, action: 'build', tower: 'cannon', col: 16, row: 7 },
+  { wave: 22, action: 'upgrade', col: 15, row: 9 },
+  { wave: 22, action: 'upgrade', col: 10, row: 10 },
+  { wave: 22, action: 'upgrade', col: 16, row: 7 },
+  { wave: 23, action: 'upgrade', col: 9, row: 8 },
+  { wave: 23, action: 'upgrade', col: 12, row: 10 },
+  { wave: 23, action: 'upgrade', col: 16, row: 7 },
+  { wave: 23, action: 'build', tower: 'multishot', col: 10, row: 8 },
+  { wave: 24, action: 'upgrade', col: 9, row: 9 },
+  { wave: 24, action: 'upgrade', col: 13, row: 9 },
+  { wave: 24, action: 'upgrade', col: 16, row: 9 },
+  { wave: 24, action: 'upgrade', col: 6, row: 10 },
+  { wave: 24, action: 'upgrade', col: 10, row: 8 },
+];
+
+const planWeakRift = [
+  { wave: 0, action: 'build', tower: 'arrow', col: 3, row: 8 },
+  { wave: 0, action: 'build', tower: 'arrow', col: 3, row: 9 },
+];
+
+const rnone = run([], { version: 'rift' });
+check('rift: no towers → defeat early', rnone.result === 'defeat' && rnone.wave <= 3,
+  `reached wave ${rnone.wave + 1}, lives ${rnone.lives}`);
+
+const rweak = run(planWeakRift, { version: 'rift' });
+check('rift: 2 arrows only → defeat before the first boss',
+  rweak.result === 'defeat' && rweak.wave < 12, `reached wave ${rweak.wave + 1}`);
+
+const rgood = run(planGoodRift, { version: 'rift' });
+check('rift: all plan placements are legal', rgood.stats.buildRejected.length === 0,
+  rgood.stats.buildRejected.join(', '));
+check('rift: good build → victory (normal, 25 waves)', rgood.result === 'victory',
+  `phase ${rgood.result}, wave ${rgood.wave}, lives ${rgood.lives}, gold ${rgood.gold}`);
+check('rift: victory with healthy lives margin', rgood.result === 'victory' && rgood.lives >= 8,
+  `lives ${rgood.lives}`);
+check('rift: economy: no huge gold surplus at victory', rgood.gold < 800, `gold ${rgood.gold}`);
+
+const rr = run(planGoodRift, { version: 'rift' });
+check('rift: deterministic replay',
+  rr.ticks === rgood.ticks && rr.gold === rgood.gold && rr.lives === rgood.lives && rr.result === rgood.result,
+  `ticks ${rr.ticks}/${rgood.ticks}, gold ${rr.gold}/${rgood.gold}`);
+
+const rgoodHard = run(planGoodRift, { version: 'rift', difficulty: 'hard' });
+check('rift: good build → victory (hard)', rgoodHard.result === 'victory',
+  `phase ${rgoodHard.result}, wave ${rgoodHard.wave}, lives ${rgoodHard.lives}`);
+const rgoodEasy = run(planGoodRift, { version: 'rift', difficulty: 'easy' });
+check('rift: good build → victory (easy)', rgoodEasy.result === 'victory', `lives ${rgoodEasy.lives}`);
+
+const rresumed = run(planGoodRift, { version: 'rift', saveRestoreAtWave: 8 });
+check('rift: save/restore at wave 8 → identical outcome',
+  rresumed.result === rgood.result && rresumed.lives === rgood.lives &&
+  rresumed.gold === rgood.gold && rresumed.ticks === rgood.ticks,
+  `lives ${rresumed.lives}/${rgood.lives}, gold ${rresumed.gold}/${rgood.gold}`);
 
 // ============================================================ 0.11.0 modes
 

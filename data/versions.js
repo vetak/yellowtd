@@ -33,11 +33,21 @@ const VersionsConfig = {
     creeps: WastesVersion.creeps,
     waves: WastesVersion.waves,
   },
+  rift: {
+    id: 'rift',
+    name: 'Разлом',
+    desc: 'Вертикальный серпантин: враги льются по шести колонкам сверху вниз. Полный арсенал из 8 башен, 25 волн, два босса и герой.',
+    unlockedBy: 'wastes',
+    map: RiftVersion.map,
+    towers: RiftVersion.towers,
+    creeps: RiftVersion.creeps,
+    waves: RiftVersion.waves,
+  },
   vortex: {
     id: 'vortex',
     name: 'Воронка',
     desc: 'Финал: спираль, закрученная к центру. Полный арсенал из 8 башен, 26 волн и ТРИ босса подряд — Хранитель, Левиафан и Аватар бури.',
-    unlockedBy: 'wastes',
+    unlockedBy: 'rift',
     map: VortexVersion.map,
     towers: VortexVersion.towers,
     creeps: VortexVersion.creeps,
@@ -46,4 +56,4 @@ const VersionsConfig = {
 };
 
 // Display order of the version cards in the menu (also the progression order).
-const VersionOrder = ['classic', 'canyon', 'wastes', 'vortex'];
+const VersionOrder = ['classic', 'canyon', 'wastes', 'rift', 'vortex'];
