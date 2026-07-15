@@ -193,11 +193,27 @@ try {
     const tl = elements['wave-timeline'].innerHTML;
     check('timeline lists upcoming waves', tl.includes('tl-strip') && tl.includes('Впереди'), tl.slice(0, 120));
     check('timeline flags the upcoming air wave', tl.includes('tl-air'), tl.slice(0, 240));
+    // 1.4.1: the chip's hover title spells out the wave's statuses in parens,
+    // e.g. "5. Пыльный рой (воздух)" — not just the number and name.
+    check('timeline chip title spells out the status (воздух)',
+      tl.includes('Пыльный рой (воздух)'),
+      (tl.match(/title="[^"]*воздух[^"]*"/) || [''])[0]);
     // From wave 4 the strip covers 4..11, which includes the bonus wave (7),
     // the regen wave (8) and the immune wave (10) — several waves of warning.
     check('timeline warns about other special waves ahead',
       tl.includes('tl-extra') && tl.includes('tl-regen') && tl.includes('tl-immune'),
       tl.slice(0, 500));
+    // 1.4.1: tapping a future-wave chip pops its full brief (touch has no hover
+    // title). Delegated handler reads data-wave off the tapped chip; simulate a
+    // tap on wave 5 (index 4, "Пыльный рой").
+    elements['wave-timeline'].fire('click', {
+      target: { closest: () => ({ dataset: { wave: '4' } }) }, clientX: 100, clientY: 100,
+    });
+    check('tapping a wave chip shows its full brief',
+      !elements['tooltip'].classList.contains('hidden') &&
+      elements['tooltip'].innerHTML.includes('Пыльный рой'),
+      elements['tooltip'].innerHTML.slice(0, 50));
+    YTD.ui._hideTooltip();
 
     // Panel keeps the same structure in both phases, so nothing below it jumps.
     // Drive the UI directly: stepping the sim with an empty field would end the

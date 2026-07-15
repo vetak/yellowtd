@@ -23,6 +23,11 @@ const TIMELINE_LENGTH = 8;
 const TIMELINE_ICON = {
   air: '✈', boss: '☠', hero: '★', immune: '◆', regen: '✚', extra: '$',
 };
+// Human-readable status names, spelled out in the timeline chip's hover title
+// so the tiny icons are self-explanatory (e.g. "5. Пыльный рой (воздух)").
+const TIMELINE_KIND_LABEL = {
+  air: 'воздух', boss: 'босс', hero: 'герой', immune: 'иммун', regen: 'реген', extra: 'бонус',
+};
 
 class UI {
   constructor(opts) {
@@ -190,6 +195,29 @@ class UI {
       this.selectedTowerId = null;
     });
 
+    // Tap a future-wave chip to pop its full brief. Touch has no hover, so the
+    // native `title` never shows there; this makes the upcoming-wave details
+    // reachable by tap (and by click on desktop). Delegated so it survives the
+    // strip being rebuilt, and works with the memoised innerHTML.
+    if (this.el['wave-timeline']) {
+      this.el['wave-timeline'].addEventListener('click', e => {
+        const chip = e.target && e.target.closest ? e.target.closest('.tl-chip') : null;
+        if (!chip || !chip.dataset) return;
+        const idx = Number(chip.dataset.wave);
+        if (Number.isNaN(idx)) return;
+        const html = this._waveBrief(idx);
+        if (html) { this._showTooltip(html, e.clientX || 0, e.clientY || 0); this._timelineTipOpen = true; }
+      });
+    }
+    // Dismiss that tapped tooltip on the next press anywhere off the strip.
+    if (typeof document !== 'undefined' && document.addEventListener) {
+      document.addEventListener('pointerdown', e => {
+        if (!this._timelineTipOpen) return;
+        const onStrip = e.target && e.target.closest && e.target.closest('#wave-timeline');
+        if (!onStrip) this._hideTooltip();
+      });
+    }
+
     this.el['send-wave-btn'].addEventListener('click', () => {
       if (!this.isActive()) return;
       const r = this.getSim().startWave();
@@ -351,6 +379,7 @@ class UI {
 
   _hideTooltip() {
     this.el['tooltip'].classList.add('hidden');
+    this._timelineTipOpen = false;
   }
 
   _levelExtras(lvl) {
@@ -596,8 +625,13 @@ class UI {
       if (wave.regen) kinds.push('regen');
       if (wave.extra) kinds.push('extra');
       const cls = kinds.length ? ' tl-' + kinds[0] : '';
-      const title = `${i + 1}. ${wave.name}`;
-      chips.push(`<span class="tl-chip${cls}" title="${title}">${i + 1}` +
+      // Spell out the wave's statuses in parentheses so the hover tooltip is
+      // informative (the coloured chip + icons only hint at them visually).
+      const labels = kinds.map(k => TIMELINE_KIND_LABEL[k]).filter(Boolean);
+      const title = `${i + 1}. ${wave.name}` + (labels.length ? ` (${labels.join(', ')})` : '');
+      // data-wave lets a tap on the chip (touch has no hover title) pop the full
+      // wave brief via the delegated handler on the strip container.
+      chips.push(`<span class="tl-chip${cls}" data-wave="${i}" title="${title}">${i + 1}` +
         (kinds.length ? `<span class="tl-dots">${kinds.map(k => TIMELINE_ICON[k] || '').join('')}</span>` : '') +
         `</span>`);
     }
