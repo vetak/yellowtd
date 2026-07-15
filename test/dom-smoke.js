@@ -287,6 +287,19 @@ try {
   check('canvas click builds tower', YTD.sim.state.towers.length === 1 && YTD.sim.state.gold === 48,
     `towers=${YTD.sim.state.towers.length}, gold=${YTD.sim.state.gold}`);
 
+  // 1.4.0: press-and-hold inspects whatever is under the point (touch has no
+  // hover). The test setTimeout runs synchronously, so pointerdown fires the
+  // hold immediately. Holding on the built tower pops its info tooltip.
+  canvas.fire('pointerdown', { pointerType: 'touch', clientX: 270, clientY: 126 });
+  check('press-and-hold shows the tower info tooltip',
+    !elements['tooltip'].classList.contains('hidden') &&
+    elements['tooltip'].innerHTML.includes('Песчаная башня'),
+    elements['tooltip'].innerHTML.slice(0, 40));
+  canvas.fire('click', { clientX: 270, clientY: 126, shiftKey: false }); // consumed by the hold
+  check('the hold suppresses the click that follows (no build/select)',
+    YTD.sim.state.towers.length === 1 && YTD.ui.selectedTowerId === null);
+  YTD.ui._hideTooltip();
+
   // 1.0.0: gold stat shakes when a build fails for lack of gold.
   YTD.ui.placingType = null;
   YTD.sim.state.gold = 0;
