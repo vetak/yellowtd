@@ -1,5 +1,5 @@
 // Global game rules. Everything tunable lives in data/ — the engine hardcodes nothing.
-const GAME_VERSION = '1.5.0';
+const GAME_VERSION = '1.6.0';
 
 const GameConfig = {
   tickRate: 20,           // fixed simulation steps per second (deterministic)

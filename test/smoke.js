@@ -16,6 +16,8 @@ const files = [
   'data/versions/canyon/towers.js', 'data/versions/canyon/waves.js',
   'data/versions/wastes/map.js', 'data/versions/wastes/creeps.js',
   'data/versions/wastes/towers.js', 'data/versions/wastes/waves.js',
+  'data/versions/vortex/map.js', 'data/versions/vortex/creeps.js',
+  'data/versions/vortex/towers.js', 'data/versions/vortex/waves.js',
   'data/versions.js',
   'engine/path.js', 'engine/sim.js',
 ];
@@ -130,13 +132,17 @@ function check(label, cond, extra) {
 
 // ======================================================= version registry
 
-check('registry: classic, canyon and wastes registered',
-  E.VersionOrder.length === 3 && !!E.VersionsConfig.classic && !!E.VersionsConfig.canyon &&
-  !!E.VersionsConfig.wastes);
-check('registry: progression chain (canyon<-classic, wastes<-canyon)',
+check('registry: four maps registered (classic/canyon/wastes/vortex)',
+  E.VersionOrder.length === 4 && !!E.VersionsConfig.classic && !!E.VersionsConfig.canyon &&
+  !!E.VersionsConfig.wastes && !!E.VersionsConfig.vortex);
+check('registry: progression chain (classic→canyon→wastes→vortex)',
   !E.VersionsConfig.classic.unlockedBy &&
   E.VersionsConfig.canyon.unlockedBy === 'classic' &&
-  E.VersionsConfig.wastes.unlockedBy === 'canyon');
+  E.VersionsConfig.wastes.unlockedBy === 'canyon' &&
+  E.VersionsConfig.vortex.unlockedBy === 'wastes');
+check('registry: vortex is a spiral (26 waves, three bosses)',
+  E.VersionsConfig.vortex.waves.length === 26 &&
+  E.VersionsConfig.vortex.waves.filter(w => w.boss).length === 3);
 check('registry: wastes has the full 8-tower arsenal (incl. storm)',
   Object.keys(E.VersionsConfig.wastes.towers).length === 8 &&
   'storm' in E.VersionsConfig.wastes.towers &&
@@ -728,6 +734,132 @@ check('wastes: save/restore at wave 8 → identical outcome',
   wresumed.result === wgood.result && wresumed.lives === wgood.lives &&
   wresumed.gold === wgood.gold && wresumed.ticks === wgood.ticks,
   `lives ${wresumed.lives}/${wgood.lives}, gold ${wresumed.gold}/${wgood.gold}`);
+
+// ------------------------------------------------ 1.6.0: Vortex (spiral final)
+// Inward spiral, 26 waves, three bosses. Towers in the rings between the coils
+// cover several arms at once; the tight centre catches the last coils.
+const planGoodVortex = [
+  { wave: 0, action: 'build', tower: 'arrow', col: 9, row: 3 },
+  { wave: 0, action: 'build', tower: 'arrow', col: 10, row: 3 },
+  { wave: 1, action: 'upgrade', col: 9, row: 3 },
+  { wave: 1, action: 'upgrade', col: 10, row: 3 },
+  { wave: 2, action: 'build', tower: 'frost', col: 9, row: 4 },
+  { wave: 2, action: 'build', tower: 'arrow', col: 8, row: 3 },
+  { wave: 3, action: 'build', tower: 'antiair', col: 11, row: 3 },
+  { wave: 3, action: 'upgrade', col: 8, row: 3 },
+  { wave: 4, action: 'build', tower: 'cannon', col: 12, row: 4 },
+  { wave: 4, action: 'upgrade', col: 12, row: 4 },
+  { wave: 5, action: 'build', tower: 'storm', col: 3, row: 9 },
+  { wave: 5, action: 'upgrade', col: 3, row: 9 },
+  { wave: 6, action: 'build', tower: 'multishot', col: 10, row: 4 },
+  { wave: 6, action: 'upgrade', col: 10, row: 4 },
+  { wave: 6, action: 'build', tower: 'poison', col: 4, row: 9 },
+  { wave: 7, action: 'build', tower: 'cannon', col: 3, row: 11 },
+  { wave: 7, action: 'upgrade', col: 3, row: 11 },
+  { wave: 7, action: 'upgrade', col: 4, row: 9 },
+  { wave: 8, action: 'build', tower: 'poison', col: 11, row: 4 },
+  { wave: 8, action: 'upgrade', col: 11, row: 4 },
+  { wave: 8, action: 'build', tower: 'sniper', col: 8, row: 4 },
+  { wave: 8, action: 'upgrade', col: 9, row: 3 },
+  { wave: 9, action: 'upgrade', col: 8, row: 4 },
+  { wave: 9, action: 'upgrade', col: 3, row: 9 },
+  { wave: 9, action: 'upgrade', col: 4, row: 9 },
+  { wave: 10, action: 'build', tower: 'storm', col: 15, row: 9 },
+  { wave: 10, action: 'upgrade', col: 15, row: 9 },
+  { wave: 10, action: 'build', tower: 'arrow', col: 12, row: 3 },
+  { wave: 11, action: 'build', tower: 'cannon', col: 16, row: 10 },
+  { wave: 11, action: 'upgrade', col: 16, row: 10 },
+  { wave: 11, action: 'upgrade', col: 12, row: 3 },
+  { wave: 12, action: 'build', tower: 'antiair', col: 15, row: 11 },
+  { wave: 12, action: 'upgrade', col: 15, row: 11 },
+  { wave: 12, action: 'build', tower: 'poison', col: 16, row: 9 },
+  { wave: 12, action: 'upgrade', col: 12, row: 3 },
+  { wave: 13, action: 'upgrade', col: 16, row: 9 },
+  { wave: 13, action: 'build', tower: 'sniper', col: 15, row: 10 },
+  { wave: 13, action: 'upgrade', col: 15, row: 10 },
+  { wave: 14, action: 'build', tower: 'storm', col: 9, row: 15 },
+  { wave: 14, action: 'upgrade', col: 9, row: 15 },
+  { wave: 14, action: 'build', tower: 'poison', col: 4, row: 11 },
+  { wave: 15, action: 'build', tower: 'multishot', col: 10, row: 15 },
+  { wave: 15, action: 'upgrade', col: 10, row: 15 },
+  { wave: 15, action: 'build', tower: 'antiair', col: 8, row: 16 },
+  { wave: 15, action: 'upgrade', col: 4, row: 11 },
+  { wave: 16, action: 'build', tower: 'cannon', col: 11, row: 16 },
+  { wave: 16, action: 'upgrade', col: 11, row: 16 },
+  { wave: 16, action: 'upgrade', col: 4, row: 11 },
+  { wave: 17, action: 'upgrade', col: 3, row: 9 },
+  { wave: 17, action: 'upgrade', col: 15, row: 9 },
+  { wave: 17, action: 'upgrade', col: 4, row: 9 },
+  { wave: 18, action: 'build', tower: 'poison', col: 7, row: 9 },
+  { wave: 18, action: 'upgrade', col: 7, row: 9 },
+  { wave: 18, action: 'build', tower: 'sniper', col: 9, row: 9 },
+  { wave: 18, action: 'upgrade', col: 9, row: 9 },
+  { wave: 19, action: 'build', tower: 'cannon', col: 9, row: 6 },
+  { wave: 19, action: 'upgrade', col: 9, row: 6 },
+  { wave: 19, action: 'build', tower: 'storm', col: 16, row: 11 },
+  { wave: 20, action: 'build', tower: 'antiair', col: 6, row: 9 },
+  { wave: 20, action: 'upgrade', col: 6, row: 9 },
+  { wave: 20, action: 'upgrade', col: 16, row: 11 },
+  { wave: 21, action: 'build', tower: 'storm', col: 9, row: 12 },
+  { wave: 21, action: 'upgrade', col: 9, row: 12 },
+  { wave: 21, action: 'upgrade', col: 16, row: 11 },
+  { wave: 22, action: 'build', tower: 'poison', col: 6, row: 12 },
+  { wave: 22, action: 'upgrade', col: 6, row: 12 },
+  { wave: 22, action: 'upgrade', col: 7, row: 9 },
+  { wave: 22, action: 'build', tower: 'cannon', col: 7, row: 12 },
+  { wave: 23, action: 'build', tower: 'multishot', col: 10, row: 6 },
+  { wave: 23, action: 'upgrade', col: 10, row: 6 },
+  { wave: 23, action: 'upgrade', col: 9, row: 9 },
+  { wave: 23, action: 'upgrade', col: 7, row: 12 },
+  { wave: 24, action: 'upgrade', col: 9, row: 12 },
+  { wave: 24, action: 'upgrade', col: 6, row: 12 },
+  { wave: 24, action: 'upgrade', col: 7, row: 9 },
+  { wave: 24, action: 'upgrade', col: 7, row: 12 },
+  { wave: 24, action: 'build', tower: 'multishot', col: 8, row: 6 },
+  { wave: 25, action: 'upgrade', col: 9, row: 6 },
+  { wave: 25, action: 'upgrade', col: 16, row: 9 },
+  { wave: 25, action: 'upgrade', col: 11, row: 4 },
+  { wave: 25, action: 'upgrade', col: 8, row: 6 },
+];
+
+const planWeakVortex = [
+  { wave: 0, action: 'build', tower: 'arrow', col: 9, row: 3 },
+  { wave: 0, action: 'build', tower: 'arrow', col: 10, row: 3 },
+];
+
+const vnone = run([], { version: 'vortex' });
+check('vortex: no towers → defeat early', vnone.result === 'defeat' && vnone.wave <= 3,
+  `reached wave ${vnone.wave + 1}, lives ${vnone.lives}`);
+
+const vweak = run(planWeakVortex, { version: 'vortex' });
+check('vortex: 2 arrows only → defeat before the first boss',
+  vweak.result === 'defeat' && vweak.wave < 9, `reached wave ${vweak.wave + 1}`);
+
+const vgood = run(planGoodVortex, { version: 'vortex' });
+check('vortex: all plan placements are legal', vgood.stats.buildRejected.length === 0,
+  vgood.stats.buildRejected.join(', '));
+check('vortex: good build → victory (normal, 26 waves)', vgood.result === 'victory',
+  `phase ${vgood.result}, wave ${vgood.wave}, lives ${vgood.lives}, gold ${vgood.gold}`);
+check('vortex: victory with healthy lives margin', vgood.result === 'victory' && vgood.lives >= 8,
+  `lives ${vgood.lives}`);
+check('vortex: economy: no huge gold surplus at victory', vgood.gold < 800, `gold ${vgood.gold}`);
+
+const va = run(planGoodVortex, { version: 'vortex' });
+check('vortex: deterministic replay',
+  va.ticks === vgood.ticks && va.gold === vgood.gold && va.lives === vgood.lives && va.result === vgood.result,
+  `ticks ${va.ticks}/${vgood.ticks}, gold ${va.gold}/${vgood.gold}`);
+
+const vgoodHard = run(planGoodVortex, { version: 'vortex', difficulty: 'hard' });
+check('vortex: good build → victory (hard)', vgoodHard.result === 'victory',
+  `phase ${vgoodHard.result}, wave ${vgoodHard.wave}, lives ${vgoodHard.lives}`);
+const vgoodEasy = run(planGoodVortex, { version: 'vortex', difficulty: 'easy' });
+check('vortex: good build → victory (easy)', vgoodEasy.result === 'victory', `lives ${vgoodEasy.lives}`);
+
+const vresumed = run(planGoodVortex, { version: 'vortex', saveRestoreAtWave: 9 });
+check('vortex: save/restore at wave 9 → identical outcome',
+  vresumed.result === vgood.result && vresumed.lives === vgood.lives &&
+  vresumed.gold === vgood.gold && vresumed.ticks === vgood.ticks,
+  `lives ${vresumed.lives}/${vgood.lives}, gold ${vresumed.gold}/${vgood.gold}`);
 
 // ============================================================ 0.11.0 modes
 
