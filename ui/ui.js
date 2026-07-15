@@ -23,6 +23,11 @@ const TIMELINE_LENGTH = 8;
 const TIMELINE_ICON = {
   air: '✈', boss: '☠', hero: '★', immune: '◆', regen: '✚', extra: '$',
 };
+// Human-readable status names, spelled out in the timeline chip's hover title
+// so the tiny icons are self-explanatory (e.g. "5. Пыльный рой (воздух)").
+const TIMELINE_KIND_LABEL = {
+  air: 'воздух', boss: 'босс', hero: 'герой', immune: 'иммун', regen: 'реген', extra: 'бонус',
+};
 
 class UI {
   constructor(opts) {
@@ -596,7 +601,10 @@ class UI {
       if (wave.regen) kinds.push('regen');
       if (wave.extra) kinds.push('extra');
       const cls = kinds.length ? ' tl-' + kinds[0] : '';
-      const title = `${i + 1}. ${wave.name}`;
+      // Spell out the wave's statuses in parentheses so the hover tooltip is
+      // informative (the coloured chip + icons only hint at them visually).
+      const labels = kinds.map(k => TIMELINE_KIND_LABEL[k]).filter(Boolean);
+      const title = `${i + 1}. ${wave.name}` + (labels.length ? ` (${labels.join(', ')})` : '');
       chips.push(`<span class="tl-chip${cls}" title="${title}">${i + 1}` +
         (kinds.length ? `<span class="tl-dots">${kinds.map(k => TIMELINE_ICON[k] || '').join('')}</span>` : '') +
         `</span>`);

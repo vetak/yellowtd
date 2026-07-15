@@ -193,6 +193,11 @@ try {
     const tl = elements['wave-timeline'].innerHTML;
     check('timeline lists upcoming waves', tl.includes('tl-strip') && tl.includes('Впереди'), tl.slice(0, 120));
     check('timeline flags the upcoming air wave', tl.includes('tl-air'), tl.slice(0, 240));
+    // 1.4.1: the chip's hover title spells out the wave's statuses in parens,
+    // e.g. "5. Пыльный рой (воздух)" — not just the number and name.
+    check('timeline chip title spells out the status (воздух)',
+      tl.includes('Пыльный рой (воздух)'),
+      (tl.match(/title="[^"]*воздух[^"]*"/) || [''])[0]);
     // From wave 4 the strip covers 4..11, which includes the bonus wave (7),
     // the regen wave (8) and the immune wave (10) — several waves of warning.
     check('timeline warns about other special waves ahead',
