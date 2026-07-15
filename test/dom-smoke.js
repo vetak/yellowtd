@@ -28,7 +28,7 @@ class FakeElement {
     this.tag = tag;
     this.children = [];
     this.dataset = {};
-    this.style = {};
+    this.style = { setProperty(k, v) { this[k] = v; } };
     this.attrs = {};
     this.disabled = false;
     this.checked = false;

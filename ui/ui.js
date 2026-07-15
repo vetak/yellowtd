@@ -54,9 +54,14 @@ class UI {
       'wave-timeline', 'wave-timer', 'send-wave-btn', 'build-buttons', 'info-panel', 'controls',
       'pause-btn', 'menu-btn', 'message', 'overlay', 'overlay-title',
       'overlay-text', 'overlay-stats', 'restart-btn', 'overlay-menu-btn', 'tooltip',
+      'board-scroll', 'zoom-in', 'zoom-out', 'zoom-fit',
     ]) {
       this.el[id] = document.getElementById(id);
     }
+
+    // Mobile board zoom (1 = whole field fits width; up to 3 = zoom in for
+    // finger-precise building, pan by scrolling the board container).
+    this.zoom = 1;
 
     this._buildButtons();
     this._bindEvents();
@@ -77,6 +82,7 @@ class UI {
     this.hoverTowerId = null;
     this.hoverCreepId = null;
     this._cache = {};
+    this._setZoom(1); // new game starts showing the whole field
     this.el['overlay'].classList.add('hidden');
   }
 
@@ -150,6 +156,9 @@ class UI {
       if (this.isActive()) this._togglePause();
     });
     this.el['menu-btn'].addEventListener('click', () => this.onOpenMenu());
+    if (this.el['zoom-in']) this.el['zoom-in'].addEventListener('click', () => this._setZoom(this.zoom + 0.5));
+    if (this.el['zoom-out']) this.el['zoom-out'].addEventListener('click', () => this._setZoom(this.zoom - 0.5));
+    if (this.el['zoom-fit']) this.el['zoom-fit'].addEventListener('click', () => this._setZoom(1));
     this.el['restart-btn'].addEventListener('click', () => this.restartGame());
     this.el['overlay-menu-btn'].addEventListener('click', () => this.onMainMenu());
     for (const btn of this.el['controls'].querySelectorAll('.speed-btn')) {
@@ -200,6 +209,16 @@ class UI {
 
   _togglePause() {
     this.loop.paused = !this.loop.paused;
+  }
+
+  // Board zoom for touch play. Only affects the mobile layout, where the CSS
+  // reads --board-zoom to scale the canvas width; on desktop the variable is
+  // simply unused, so this is a no-op there.
+  _setZoom(z) {
+    this.zoom = Math.max(1, Math.min(3, Math.round(z * 2) / 2));
+    if (this.el['board-scroll']) {
+      this.el['board-scroll'].style.setProperty('--board-zoom', this.zoom);
+    }
   }
 
   _onCanvasClick(x, y, keepPlacing) {

@@ -9,7 +9,14 @@
 <body>
 <div id="app">
   <div id="game-area">
-    <canvas id="game-canvas"></canvas>
+    <div id="board-scroll">
+      <canvas id="game-canvas"></canvas>
+    </div>
+    <div id="zoom-controls">
+      <button id="zoom-out" title="Отдалить" aria-label="Отдалить">−</button>
+      <button id="zoom-fit" title="Показать всё поле" aria-label="Вписать поле">⤢</button>
+      <button id="zoom-in" title="Приблизить" aria-label="Приблизить">+</button>
+    </div>
     <div id="overlay" class="hidden">
       <div id="overlay-title"></div>
       <div id="overlay-text"></div>
@@ -26,6 +33,7 @@
         <li>Тап/клик по свободной клетке — башня построена</li>
         <li>Тап/клик по башне — улучшить или продать</li>
         <li>Повторный тап по кнопке башни — отменить выбор</li>
+        <li>Кнопки +/− у поля — приблизить и точно ставить башни</li>
         <li>Пауза и меню — кнопки внизу панели</li>
       </ul>
       <button id="tutorial-dismiss">Понятно, начинаем!</button>
