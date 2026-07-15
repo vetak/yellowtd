@@ -26,14 +26,24 @@ const VersionsConfig = {
   wastes: {
     id: 'wastes',
     name: 'Пустоши',
-    desc: 'Endgame: длинный шестиполосный серпантин, полный арсенал из 8 башен (вкл. грозовую), 24 самых крепких волны и два босса.',
+    desc: 'Длинный шестиполосный серпантин, полный арсенал из 8 башен (вкл. грозовую), 24 самых крепких волны и два босса.',
     unlockedBy: 'canyon',
     map: WastesVersion.map,
     towers: WastesVersion.towers,
     creeps: WastesVersion.creeps,
     waves: WastesVersion.waves,
   },
+  vortex: {
+    id: 'vortex',
+    name: 'Воронка',
+    desc: 'Финал: спираль, закрученная к центру. Полный арсенал из 8 башен, 26 волн и ТРИ босса подряд — Хранитель, Левиафан и Аватар бури.',
+    unlockedBy: 'wastes',
+    map: VortexVersion.map,
+    towers: VortexVersion.towers,
+    creeps: VortexVersion.creeps,
+    waves: VortexVersion.waves,
+  },
 };
 
 // Display order of the version cards in the menu (also the progression order).
-const VersionOrder = ['classic', 'canyon', 'wastes'];
+const VersionOrder = ['classic', 'canyon', 'wastes', 'vortex'];
