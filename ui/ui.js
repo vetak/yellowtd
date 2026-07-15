@@ -82,6 +82,9 @@ class UI {
     this.hoverTowerId = null;
     this.hoverCreepId = null;
     this._cache = {};
+    this._wavePanelSig = null;   // invalidate the memoised wave panel / timeline
+    this._timelineFrom = null;
+    this._timelineWaves = null;
     this._setZoom(1); // new game starts showing the whole field
     this.el['overlay'].classList.add('hidden');
   }
@@ -136,8 +139,48 @@ class UI {
       this.hoverCreepId = null;
       this._hideTooltip();
     });
+    // Press-and-hold to inspect. Touch has no hover, so holding still on the
+    // battlefield pops the info tooltip for the creep/tower under the point
+    // (HP, armor, level…). Works with the mouse too. A fired hold suppresses the
+    // click that follows so it doesn't also build/select. Panning (a moved
+    // finger) cancels the hold, so it never fights with scroll-to-pan.
+    let holdTimer = null, holdFired = false, holdStart = null;
+    const clearHold = () => { if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; } };
+    canvas.addEventListener('pointerdown', e => {
+      if (!this.isActive()) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      this._hideTooltip();
+      this.hoverCreepId = null;
+      holdFired = false;
+      holdStart = { x: e.clientX, y: e.clientY };
+      const p = this._canvasPos(e);
+      // Capture what's under the point NOW: a creep can walk out from under the
+      // finger during the hold delay, so remember it by id and follow it when
+      // the hold fires (towers are static, so id works for them too).
+      const sim = this.getSim();
+      const hit = sim ? this.renderer.pickAt(p.x, p.y, sim) : null;
+      const creepId = hit && hit.creep ? hit.creep.id : null;
+      const towerId = hit && hit.tower ? hit.tower.id : null;
+      const cx = e.clientX, cy = e.clientY;
+      clearHold();
+      holdTimer = setTimeout(() => {
+        holdTimer = null;
+        holdFired = true;
+        this._inspectHold(creepId, towerId, cx, cy);
+      }, 450);
+    });
+    canvas.addEventListener('pointermove', e => {
+      if (holdStart && Math.hypot(e.clientX - holdStart.x, e.clientY - holdStart.y) > 12) {
+        clearHold(); // finger moved: it's a pan/drag, not a long-press
+        holdStart = null;
+      }
+    });
+    canvas.addEventListener('pointerup', () => { clearHold(); holdStart = null; });
+    canvas.addEventListener('pointercancel', () => { clearHold(); holdStart = null; });
+
     canvas.addEventListener('click', e => {
       if (!this.isActive()) return;
+      if (holdFired) { holdFired = false; return; } // long-press: don't build/select
       const p = this._canvasPos(e);
       this._onCanvasClick(p.x, p.y, e.shiftKey || e.ctrlKey);
     });
@@ -225,6 +268,27 @@ class UI {
     this.zoom = Math.max(1, Math.min(3, Math.round(z * 2) / 2));
     if (this.el['board-scroll']) {
       this.el['board-scroll'].style.setProperty('--board-zoom', String(this.zoom));
+    }
+  }
+
+  // Show the info tooltip for the creep/tower captured at press time — used by
+  // press-and-hold so touch players can read enemy/tower stats without hover.
+  // A creep is preferred (it's what you aimed at) and followed by id even if it
+  // has since moved; update() then live-refreshes its HP and clears on death.
+  _inspectHold(creepId, towerId, cx, cy) {
+    const sim = this.getSim();
+    if (!sim) return;
+    if (creepId != null) {
+      const c = sim.state.creeps.find(cr => cr.id === creepId);
+      if (c) { this.hoverCreepId = c.id; this._showTooltip(this._creepTooltip(c), cx, cy); return; }
+    }
+    if (towerId != null) {
+      const t = sim.getTower(towerId);
+      if (t) {
+        const def = this.towersCfg[t.typeId];
+        this._showTooltip(
+          `<b>${def.name}</b> — ур. ${t.level + 1}/${def.levels.length} · тап — управление`, cx, cy);
+      }
     }
   }
 
@@ -447,17 +511,26 @@ class UI {
     // once a wave is live it's the wave a button press would actually send.
     const nextIdx = live.length === 0 ? s.waveIndex + 1 : s.waveIndex + live.length;
 
-    const label = live.length > 0 ? 'Идёт волна:' : 'Следующая волна:';
-    let html = `<div class="phase-label">${label}</div>` + this._waveBrief(primaryIdx);
-    if (live.length > 1) {
-      const w2 = this._waveAt(live[1].index);
-      if (w2) {
-        html += `<div class="next-brief"><div class="wname">Также в поле — ${live[1].index + 1}. ` +
-          `${w2.name} ${this._waveBadges(w2).join(' ')}</div></div>`;
+    // The wave-name block depends only on the live/upcoming wave indices and the
+    // phase (HP scaling is fixed for the run), not on the per-frame countdown.
+    // Rebuild its HTML only when that signature changes — the countdown and the
+    // send button below still refresh every frame.
+    const sig = live.length + '|' + primaryIdx + '|' +
+      (live.length > 1 ? live[1].index : '') + '|' + nextIdx;
+    if (sig !== this._wavePanelSig) {
+      this._wavePanelSig = sig;
+      const label = live.length > 0 ? 'Идёт волна:' : 'Следующая волна:';
+      let html = `<div class="phase-label">${label}</div>` + this._waveBrief(primaryIdx);
+      if (live.length > 1) {
+        const w2 = this._waveAt(live[1].index);
+        if (w2) {
+          html += `<div class="next-brief"><div class="wname">Также в поле — ${live[1].index + 1}. ` +
+            `${w2.name} ${this._waveBadges(w2).join(' ')}</div></div>`;
+        }
       }
+      html += this._waveNextBrief(nextIdx);
+      this._set('wave-name', html);
     }
-    html += this._waveNextBrief(nextIdx);
-    this._set('wave-name', html);
 
     const timer = live.length === 0
       ? (sim.cfg.autoStartWaves !== false
@@ -505,6 +578,12 @@ class UI {
   // Upcoming-waves timeline: a compact strip of the next few waves so special
   // ones (air/boss/immune) are visible several waves ahead, not as a surprise.
   _updateWaveTimeline(from) {
+    // The strip depends only on the start index and the wave set (kinds are
+    // difficulty-independent). Skip rebuilding its 8 chips every frame when
+    // neither changed. `_timelineWaves` also invalidates on a version swap.
+    if (from === this._timelineFrom && this.wavesCfg === this._timelineWaves) return;
+    this._timelineFrom = from;
+    this._timelineWaves = this.wavesCfg;
     const chips = [];
     for (let i = from; i < from + TIMELINE_LENGTH; i++) {
       const wave = this._waveAt(i);
