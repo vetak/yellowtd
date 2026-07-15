@@ -211,6 +211,13 @@ class UI {
     this.loop.paused = !this.loop.paused;
   }
 
+  // Is the compact mobile layout active? (matches the CSS breakpoint.) Guarded
+  // so it stays a safe no-op under the headless test stub (no matchMedia).
+  _isMobileLayout() {
+    return !!(typeof window !== 'undefined' && window.matchMedia &&
+      window.matchMedia('(max-width: 1024px)').matches);
+  }
+
   // Board zoom for touch play. Only affects the mobile layout, where the CSS
   // reads --board-zoom to scale the canvas width; on desktop the variable is
   // simply unused, so this is a no-op there.
@@ -359,6 +366,7 @@ class UI {
     this._updateMessage();
     this._updateOverlay(sim);
     this._updateCursor();
+    this._revealSelectedTower();
 
     // live-refresh creep tooltip hp
     if (this.hoverCreepId) {
@@ -639,5 +647,17 @@ class UI {
 
   _updateCursor() {
     this.canvas.classList.toggle('placing', !!this.placingType);
+  }
+
+  // On mobile the tower info panel (with upgrade/sell) sits below the board, so
+  // tapping a tower could leave its controls off-screen. When the selection
+  // changes to a tower, scroll its panel into view. No-op on desktop / in tests.
+  _revealSelectedTower() {
+    if (this.selectedTowerId === this._lastRevealed) return;
+    this._lastRevealed = this.selectedTowerId;
+    const el = this.el['info-panel'];
+    if (this.selectedTowerId && el && el.scrollIntoView && this._isMobileLayout()) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   }
 }
