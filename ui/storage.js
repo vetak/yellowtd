@@ -79,6 +79,19 @@ const Storage = (() => {
       return !!(progress && progress.won && progress.won[difficultyId]);
     },
 
+    // ---- Progress: which map versions have ever been beaten (any difficulty).
+    // Used to gate the map-progression chain (versions with unlockedBy: <id>).
+    recordMapVictory(versionId) {
+      const progress = readJson(PROGRESS_KEY) || { won: {} };
+      progress.wonMaps = progress.wonMaps || {};
+      progress.wonMaps[versionId] = true;
+      writeJson(PROGRESS_KEY, progress);
+    },
+    hasWonMap(versionId) {
+      const progress = readJson(PROGRESS_KEY);
+      return !!(progress && progress.wonMaps && progress.wonMaps[versionId]);
+    },
+
     // ---- Leaderboard: best runs per version x difficulty, newest ties lose.
     // Sorted by wave reached (desc), then lives left (desc), then gold (desc).
     addRecord(versionId, difficultyId, entry) {

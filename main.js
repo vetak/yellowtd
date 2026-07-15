@@ -113,6 +113,14 @@
     return Storage.hasWon(def.unlockedBy);
   }
 
+  // Map-progression gate: a version with `unlockedBy` opens only once that
+  // prerequisite map has been beaten (on any difficulty). First map is open.
+  function isVersionUnlocked(verId) {
+    const v = VersionsConfig[verId];
+    if (!v || !v.unlockedBy) return true;
+    return Storage.hasWonMap(v.unlockedBy);
+  }
+
   function updateFooter() {
     const el = document.getElementById('footer-line');
     const ver = ' · ' + VersionsConfig[versionId].name;
@@ -279,6 +287,7 @@
     continueInfo,
     isDifficultyUnlocked,
     getRecords: (verId, diffId) => Storage.getRecords(verId, diffId),
+    isVersionUnlocked,
     onNewGame: startNewGame,
     onContinue: continueGame,
     onResume: resumeGame,
@@ -347,7 +356,10 @@
           if (ev.type === 'waveStart' || ev.type === 'waveEnd') saveNow();
           else if (ev.type === 'victory' || ev.type === 'defeat') {
             Storage.clearGame(versionId);
-            if (ev.type === 'victory') Storage.recordVictory(difficultyId);
+            if (ev.type === 'victory') {
+              Storage.recordVictory(difficultyId);
+              Storage.recordMapVictory(versionId); // unlocks the next map in the chain
+            }
             const entry = {
               wave: sim.state.waveIndex, // waves fully completed — matches "Волн пройдено" on the results screen
               lives: sim.state.lives,

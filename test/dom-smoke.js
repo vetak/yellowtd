@@ -48,7 +48,10 @@ class FakeElement {
     };
   }
   get innerHTML() { return this._html; }
-  set innerHTML(v) { this._html = String(v); }
+  // Setting innerHTML replaces all child nodes in the real DOM; mirror that so
+  // rebuild-then-append patterns (innerHTML='' + appendChild) don't accumulate
+  // stale children across repeated rebuilds.
+  set innerHTML(v) { this._html = String(v); this.children = []; }
   setAttribute(k, v) { this.attrs[k] = String(v); }
   getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
   addEventListener(type, fn) { (this._handlers[type] = this._handlers[type] || []).push(fn); }
@@ -445,8 +448,18 @@ try {
   elements['pause-btn'].fire('click');
 
   // --- 0.8.0: canyon version — separate map, towers and save slot ---
+  // 1.5.0: maps form a progression chain — Canyon is locked until Classic is
+  // beaten (on any difficulty), then it unlocks live in the menu.
   YTD.app.openMainMenu();
   elements['menu-new'].fire('click');
+  check('canyon card is locked before classic is beaten',
+    String(elements['version-cards'].children[1].className).includes('locked') &&
+    elements['version-cards'].children[1].disabled === true);
+  YTD.Storage.recordMapVictory('classic');
+  YTD.menu.show('version'); // rebuild cards — the unlock should light up
+  check('canyon card unlocks after a classic victory',
+    !String(elements['version-cards'].children[1].className).includes('locked') &&
+    elements['version-cards'].children[1].disabled === false);
   elements['version-cards'].children[1].fire('click'); // canyon
   elements['diff-buttons'].children[1].fire('click');  // normal
   check('canyon game starts', YTD.app.state === 'playing' && YTD.versionId === 'canyon',
