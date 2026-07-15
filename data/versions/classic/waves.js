@@ -1,4 +1,5 @@
-// Classic waves: 36 waves in three acts (bosses at 12/24/36).
+// Classic waves: 36 waves in three acts. Bosses (boss:true) at 24 & 36;
+// hero mini-boss waves (hero:true) at 12 & 33.
 // Special flags: immuneToSlow, regen (hp/sec), hero (mini-boss), extra (bonus
 // wave: escapes cost no lives, kills pay double), boss.
 globalThis.ClassicVersion = globalThis.ClassicVersion || {};
