@@ -203,6 +203,17 @@ try {
     check('timeline warns about other special waves ahead',
       tl.includes('tl-extra') && tl.includes('tl-regen') && tl.includes('tl-immune'),
       tl.slice(0, 500));
+    // 1.4.1: tapping a future-wave chip pops its full brief (touch has no hover
+    // title). Delegated handler reads data-wave off the tapped chip; simulate a
+    // tap on wave 5 (index 4, "Пыльный рой").
+    elements['wave-timeline'].fire('click', {
+      target: { closest: () => ({ dataset: { wave: '4' } }) }, clientX: 100, clientY: 100,
+    });
+    check('tapping a wave chip shows its full brief',
+      !elements['tooltip'].classList.contains('hidden') &&
+      elements['tooltip'].innerHTML.includes('Пыльный рой'),
+      elements['tooltip'].innerHTML.slice(0, 50));
+    YTD.ui._hideTooltip();
 
     // Panel keeps the same structure in both phases, so nothing below it jumps.
     // Drive the UI directly: stepping the sim with an empty field would end the
