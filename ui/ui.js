@@ -54,9 +54,14 @@ class UI {
       'wave-timeline', 'wave-timer', 'send-wave-btn', 'build-buttons', 'info-panel', 'controls',
       'pause-btn', 'menu-btn', 'message', 'overlay', 'overlay-title',
       'overlay-text', 'overlay-stats', 'restart-btn', 'overlay-menu-btn', 'tooltip',
+      'board-scroll', 'zoom-in', 'zoom-out', 'zoom-fit',
     ]) {
       this.el[id] = document.getElementById(id);
     }
+
+    // Mobile board zoom (1 = whole field fits width; up to 3 = zoom in for
+    // finger-precise building, pan by scrolling the board container).
+    this.zoom = 1;
 
     this._buildButtons();
     this._bindEvents();
@@ -77,6 +82,7 @@ class UI {
     this.hoverTowerId = null;
     this.hoverCreepId = null;
     this._cache = {};
+    this._setZoom(1); // new game starts showing the whole field
     this.el['overlay'].classList.add('hidden');
   }
 
@@ -150,6 +156,9 @@ class UI {
       if (this.isActive()) this._togglePause();
     });
     this.el['menu-btn'].addEventListener('click', () => this.onOpenMenu());
+    if (this.el['zoom-in']) this.el['zoom-in'].addEventListener('click', () => this._setZoom(this.zoom + 0.5));
+    if (this.el['zoom-out']) this.el['zoom-out'].addEventListener('click', () => this._setZoom(this.zoom - 0.5));
+    if (this.el['zoom-fit']) this.el['zoom-fit'].addEventListener('click', () => this._setZoom(1));
     this.el['restart-btn'].addEventListener('click', () => this.restartGame());
     this.el['overlay-menu-btn'].addEventListener('click', () => this.onMainMenu());
     for (const btn of this.el['controls'].querySelectorAll('.speed-btn')) {
@@ -200,6 +209,23 @@ class UI {
 
   _togglePause() {
     this.loop.paused = !this.loop.paused;
+  }
+
+  // Is the compact mobile layout active? (matches the CSS breakpoint.) Guarded
+  // so it stays a safe no-op under the headless test stub (no matchMedia).
+  _isMobileLayout() {
+    return !!(typeof window !== 'undefined' && window.matchMedia &&
+      window.matchMedia('(max-width: 1024px)').matches);
+  }
+
+  // Board zoom for touch play. Only affects the mobile layout, where the CSS
+  // reads --board-zoom to scale the canvas width; on desktop the variable is
+  // simply unused, so this is a no-op there.
+  _setZoom(z) {
+    this.zoom = Math.max(1, Math.min(3, Math.round(z * 2) / 2));
+    if (this.el['board-scroll']) {
+      this.el['board-scroll'].style.setProperty('--board-zoom', String(this.zoom));
+    }
   }
 
   _onCanvasClick(x, y, keepPlacing) {
@@ -340,6 +366,7 @@ class UI {
     this._updateMessage();
     this._updateOverlay(sim);
     this._updateCursor();
+    this._revealSelectedTower();
 
     // live-refresh creep tooltip hp
     if (this.hoverCreepId) {
@@ -515,9 +542,9 @@ class UI {
       if (this.selectedTowerId) this.selectedTowerId = null;
       const keyCount = Object.keys(this.towersCfg).length;
       this._set('info-panel',
-        `<div class="muted">Выберите башню (кнопки или клавиши 1–${keyCount}) и кликните по свободной клетке.` +
-        ` Shift/Ctrl+клик — строить несколько подряд. Клик по построенной башне — улучшение и продажа.` +
-        ` ПКМ — отмена. Пробел — пауза. Esc — меню.</div>`);
+        `<div class="muted">Выберите башню (кнопки или клавиши 1–${keyCount}) и тапните по свободной клетке.` +
+        ` Тап по построенной башне — улучшение и продажа. Shift/Ctrl+клик — строить несколько подряд.` +
+        ` Пауза и меню — кнопки внизу панели (пробел/Esc на ПК).</div>`);
       return;
     }
     const def = this.towersCfg[t.typeId];
@@ -620,5 +647,17 @@ class UI {
 
   _updateCursor() {
     this.canvas.classList.toggle('placing', !!this.placingType);
+  }
+
+  // On mobile the tower info panel (with upgrade/sell) sits below the board, so
+  // tapping a tower could leave its controls off-screen. When the selection
+  // changes to a tower, scroll its panel into view. No-op on desktop / in tests.
+  _revealSelectedTower() {
+    if (this.selectedTowerId === this._lastRevealed) return;
+    this._lastRevealed = this.selectedTowerId;
+    const el = this.el['info-panel'];
+    if (this.selectedTowerId && el && el.scrollIntoView && this._isMobileLayout()) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   }
 }
