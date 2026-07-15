@@ -82,27 +82,38 @@
     this.versionCards.innerHTML = '';
     ids.forEach((id) => {
       const v = this.opts.versions[id];
+      const unlocked = !this.opts.isVersionUnlocked || this.opts.isVersionUnlocked(id);
       const card = document.createElement('button');
-      card.className = 'version-card';
+      card.className = 'version-card' + (unlocked ? '' : ' locked');
       card.setAttribute('data-version', id);
       const preview = document.createElement('canvas');
       preview.className = 'version-preview';
       preview.width = 168;
       preview.height = 140;
-      const towerNames = Object.values(v.towers).map(t => t.name).join(', ');
       const info = document.createElement('span');
       info.className = 'version-info';
-      info.innerHTML = '<strong>' + v.name + '</strong>' +
-        '<span class="vdesc">' + v.desc + '</span>' +
-        '<span class="vmeta">Волн: ' + v.waves.length +
-        ' · Башен: ' + Object.keys(v.towers).length + '</span>' +
-        '<span class="vtowers">' + towerNames + '</span>';
+      if (unlocked) {
+        const towerNames = Object.values(v.towers).map(t => t.name).join(', ');
+        info.innerHTML = '<strong>' + v.name + '</strong>' +
+          '<span class="vdesc">' + v.desc + '</span>' +
+          '<span class="vmeta">Волн: ' + v.waves.length +
+          ' · Башен: ' + Object.keys(v.towers).length + '</span>' +
+          '<span class="vtowers">' + towerNames + '</span>';
+        card.addEventListener('click', () => {
+          this.pendingVersionId = id;
+          this.show('difficulty');
+        });
+      } else {
+        const need = this.opts.versions[v.unlockedBy];
+        info.innerHTML = '<strong>🔒 ' + v.name + '</strong>' +
+          '<span class="vdesc">Откроется после победы на «' +
+          (need ? need.name : v.unlockedBy) + '»</span>' +
+          '<span class="vmeta">Волн: ' + v.waves.length +
+          ' · Башен: ' + Object.keys(v.towers).length + '</span>';
+        card.disabled = true;
+      }
       card.appendChild(preview);
       card.appendChild(info);
-      card.addEventListener('click', () => {
-        this.pendingVersionId = id;
-        this.show('difficulty');
-      });
       this.versionCards.appendChild(card);
       this._drawRoutePreview(preview, v.map);
     });
@@ -324,6 +335,7 @@
     if (name === 'settings' || name === 'records') {
       this.prevScreen = this.currentScreen || (this.mode === 'pause' ? 'pause' : 'main');
     }
+    if (name === 'version') this.buildVersionCards(); // unlocks can change mid-session
     if (name === 'difficulty') { this.buildDifficultyButtons(); this.updateChallengesCount(); }
     if (name === 'records') this.buildRecords();
     Object.keys(this.screens).forEach((key) => {

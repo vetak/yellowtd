@@ -189,6 +189,12 @@ button.active { background: #6b5d1f; border-color: #e6c832; }
 .diff-btn.locked { opacity: 0.55; cursor: default; }
 .diff-btn.locked:hover { background: none; }
 
+/* Locked map card in the progression chain: dimmed, non-interactive, its route
+   preview shown as a teaser. */
+.version-card.locked { opacity: 0.5; cursor: default; }
+.version-card.locked:hover { background: none; transform: none; }
+.version-card.locked .version-preview { filter: grayscale(0.7); }
+
 #records-body { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow: auto; }
 .records-title { font-size: 13px; font-weight: 700; color: #e6c832; margin-bottom: 4px; }
 .records-table { width: 100%; border-collapse: collapse; font-size: 12px; }
