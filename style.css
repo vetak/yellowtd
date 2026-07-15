@@ -628,3 +628,54 @@ h1 { font-size: 26px; }
   /* Быстрые серии тапов не должны выделять текст в интерфейсе. */
   #sidebar, #controls, #build-panel, .menu-card { user-select: none; -webkit-user-select: none; }
 }
+
+/* --- 1.3.0: горизонтальная (ландшафтная) раскладка телефона --- */
+/* Телефон в альбомной ориентации широкий и низкий: колонка невыгодна (поле
+   зажато по высоте). Возвращаем «поле слева + панель справа» — поле вписывается
+   по высоте экрана, панель прокручивается сбоку. Идёт ПОСЛЕ портретного
+   медиазапроса, поэтому перекрывает flex-direction/ширины для этого случая. */
+@media (orientation: landscape) and (max-height: 600px) {
+  body {
+    padding: 6px;
+    height: 100vh;
+    align-items: stretch;
+  }
+  #app {
+    flex-direction: row;
+    gap: 8px;
+    height: calc(100vh - 12px);
+    max-width: 100%;
+  }
+  #game-area {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+  }
+  #board-scroll {
+    max-height: 100%;
+    max-width: 100%;
+    height: 100%;
+    overflow: auto;
+    touch-action: pan-x pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Вписываем поле сразу по ширине И высоте (contain): при зуме 1 видна вся
+     карта на любом телефоне; зум множит оба предела — поле растёт, панорама
+     скроллом. */
+  #game-canvas {
+    width: auto;
+    height: auto;
+    max-width: calc(100% * var(--board-zoom, 1));
+    max-height: calc((100vh - 12px) * var(--board-zoom, 1));
+  }
+  #sidebar {
+    width: 300px;
+    flex: none;
+    height: 100%;
+    overflow-y: auto;
+  }
+  #zoom-controls { right: 8px; bottom: 8px; }
+}
